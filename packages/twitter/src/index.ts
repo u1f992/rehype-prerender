@@ -16,22 +16,22 @@ const MARKER = "dataPrerenderTwitter";
 // 埋めていく。setter時点でbindしようとしてもeventsがまだ無いので、
 // 同じオブジェクト参照を掴んだままevents.bindが生えるのを短間隔で待ち、
 // 揃い次第bindする。
-const doneScript = `
+const initScript = `
 (function () {
-  Object.defineProperty(window, 'twttr', {
+  Object.defineProperty(window, "twttr", {
     configurable: true,
     get: function () { return undefined; },
     set: function (value) {
-      Object.defineProperty(window, 'twttr', {
+      Object.defineProperty(window, "twttr", {
         value: value,
         writable: true,
         configurable: true,
       });
-      var bound = false;
-      var attempt = function () {
+      let bound = false;
+      const attempt = function () {
         if (bound) return;
-        if (value && value.events && typeof value.events.bind === 'function') {
-          value.events.bind('loaded', function () {
+        if (value && value.events && typeof value.events.bind === "function") {
+          value.events.bind("loaded", function () {
             window[Symbol.for(${JSON.stringify(DONE_KEY)})] = true;
           });
           bound = true;
@@ -69,7 +69,7 @@ export function twitterSpec({
       hasMatch(tree, "blockquote.twitter-tweet") &&
       hasElement(tree, isTwitterScript),
     prepare: (tree) => {
-      prependToHead(tree, inlineScript(doneScript, { [MARKER]: "" }));
+      prependToHead(tree, inlineScript(initScript, { [MARKER]: "" }));
     },
     waitUntil: (page) =>
       page.waitForFunction(
@@ -104,19 +104,19 @@ export function twitterSpec({
         const allCss = await frame.evaluate(`
           Array.from(document.styleSheets).map(function (sheet) {
             try {
-              return Array.from(sheet.cssRules).map(function (r) { return r.cssText; }).join('\\n');
-            } catch (e) { return ''; }
-          }).join('\\n')
+              return Array.from(sheet.cssRules).map(function (r) { return r.cssText; }).join("\\n");
+            } catch (e) { return ""; }
+          }).join("\\n")
         `);
         const bodyInnerHtml = await frame.evaluate("document.body.innerHTML");
         // body の computed style からレイアウト関連プロパティを取得
         const bodyComputedStyle = await frame.evaluate(`
           (function () {
-            var cs = getComputedStyle(document.body);
-            var props = ['margin','padding','background-color','color'];
+            const cs = getComputedStyle(document.body);
+            const props = ["margin", "padding", "background-color", "color"];
             return props.map(function (p) {
-              return p + ':' + cs.getPropertyValue(p);
-            }).join(';');
+              return p + ":" + cs.getPropertyValue(p);
+            }).join(";");
           })()
         `);
 

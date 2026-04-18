@@ -11,10 +11,10 @@ import {
 const DONE_KEY = "mathjax-prerender-done";
 const MARKER = "dataPrerenderMathjax";
 
-const authorInit = `
+const initScript = `
 (function () {
-  var existing = window.MathJax || {};
-  var prev = typeof existing.AuthorInit === "function" ? existing.AuthorInit : null;
+  const existing = window.MathJax || {};
+  const prev = typeof existing.AuthorInit === "function" ? existing.AuthorInit : null;
   existing.AuthorInit = function () {
     if (prev) prev.apply(this, arguments);
     MathJax.Hub.Register.StartupHook("End", function () {
@@ -49,7 +49,7 @@ export function mathjaxSpec({
   return {
     when: (tree) => hasElement(tree, isMathJaxScript),
     prepare: (tree) => {
-      prependToHead(tree, inlineScript(authorInit, { [MARKER]: "" }));
+      prependToHead(tree, inlineScript(initScript, { [MARKER]: "" }));
     },
     waitUntil: (page) =>
       page.waitForFunction(

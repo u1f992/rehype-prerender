@@ -10,15 +10,16 @@ import {
 
 const MARKER = "dataPrerenderPrism";
 
-const runnerScript = `
-window.Prism = window.Prism || {};
-window.Prism.manual = true;
-
-window.addEventListener('load', function () {
-  if (window.Prism && typeof Prism.highlightAll === 'function') {
-    Prism.highlightAll(false);
-  }
-});
+const initScript = `
+(function () {
+  window.Prism = window.Prism || {};
+  window.Prism.manual = true;
+  window.addEventListener("load", function () {
+    if (window.Prism && typeof Prism.highlightAll === "function") {
+      Prism.highlightAll(false);
+    }
+  });
+})();
 `;
 
 /**
@@ -44,7 +45,7 @@ export function prismSpec({
   return {
     when: (tree) => hasElement(tree, isPrismScript),
     prepare: (tree) => {
-      prependToHead(tree, inlineScript(runnerScript, { [MARKER]: "" }));
+      prependToHead(tree, inlineScript(initScript, { [MARKER]: "" }));
     },
     waitUntil: (page) =>
       page.waitForNetworkIdle({

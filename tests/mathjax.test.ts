@@ -14,7 +14,13 @@ import {
   removeScripts,
   type PrerenderSpec,
 } from "../src/index.ts";
-import { BROWSER_CACHE_DIR, FIXTURES_DIR, RESULTS_DIR } from "./helpers.ts";
+import {
+  assertVisualMatch,
+  BROWSER_CACHE_DIR,
+  FIXTURES_DIR,
+  RESULTS_DIR,
+  screenshotHtml,
+} from "./helpers.ts";
 
 /**
  * Recognize the MathJax CDN reference VFM emits, as well as any extension
@@ -97,4 +103,11 @@ test("MathJax: 数式がCHTML化され、<script>参照が除去される", asyn
 
   fs.mkdirSync(RESULTS_DIR, { recursive: true });
   fs.writeFileSync(path.join(RESULTS_DIR, "mathjax.html"), output);
+
+  const ssOpts = { browserCacheDir: BROWSER_CACHE_DIR, launchArgs: ["--no-sandbox"] as const };
+  const fixtureShot = await screenshotHtml(html, ssOpts);
+  const resultShot = await screenshotHtml(output, ssOpts);
+  assertVisualMatch(resultShot, fixtureShot, {
+    diffOutputPath: path.join(RESULTS_DIR, "mathjax-diff.png"),
+  });
 });

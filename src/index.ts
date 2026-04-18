@@ -84,12 +84,12 @@ type PrerenderOptions = {
 
 const DEFAULT_BASE_URL = "https://prerender.invalid/";
 const DEFAULT_TIMEOUT_MS = 30_000;
-const DEFAULT_CHROME_BUILD_ID = "146.0.7680.153";
+export const DEFAULT_CHROME_BUILD_ID = "146.0.7680.153";
 
 /**
  * Ensure Chrome is installed under cacheDir and return its executable path.
  */
-async function ensureBrowserExecutable({
+export async function ensureBrowserExecutable({
   browserCacheDir: cacheDir,
   chromeBuildId: buildId,
 }: {

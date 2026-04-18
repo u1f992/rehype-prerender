@@ -15,7 +15,18 @@ import {
   removeScripts,
   type PrerenderSpec,
 } from "../src/index.ts";
-import { BROWSER_CACHE_DIR, FIXTURES_DIR, RESULTS_DIR } from "./helpers.ts";
+import {
+  assertVisualMatch,
+  BROWSER_CACHE_DIR,
+  FIXTURES_DIR,
+  RESULTS_DIR,
+  screenshotHtml,
+} from "./helpers.ts";
+
+const ssOpts = {
+  browserCacheDir: BROWSER_CACHE_DIR,
+  launchArgs: ["--no-sandbox"] as const,
+};
 
 const PRISM_RESULTS_DIR = path.join(RESULTS_DIR, "prism");
 
@@ -126,6 +137,12 @@ test("Prism: autoloaderが言語を取得しトークン化、Prism参照が除�
 
   fs.mkdirSync(PRISM_RESULTS_DIR, { recursive: true });
   fs.writeFileSync(path.join(PRISM_RESULTS_DIR, "autoloader.html"), output);
+
+  const fixtureShot = await screenshotHtml(html, ssOpts);
+  const resultShot = await screenshotHtml(output, ssOpts);
+  assertVisualMatch(resultShot, fixtureShot, {
+    diffOutputPath: path.join(PRISM_RESULTS_DIR, "autoloader-diff.png"),
+  });
 });
 
 test("Prism file-highlight + autoloader: autoloaderで言語を取得しdata-srcの外部ファイルをトークン化", async () => {
@@ -161,6 +178,15 @@ test("Prism file-highlight + autoloader: autoloaderで言語を取得しdata-src
     path.join(PRISM_RESULTS_DIR, "file-highlight-autoloader.html"),
     output,
   );
+
+  const fixtureShot = await screenshotHtml(html, {
+    ...ssOpts,
+    baseDir: PRISM_FIXTURES_DIR,
+  });
+  const resultShot = await screenshotHtml(output, ssOpts);
+  assertVisualMatch(resultShot, fixtureShot, {
+    diffOutputPath: path.join(PRISM_RESULTS_DIR, "file-highlight-autoloader-diff.png"),
+  });
 });
 
 test("Prism file-highlight: data-srcで外部ファイルを読み込みトークン化される", async () => {
@@ -196,4 +222,13 @@ test("Prism file-highlight: data-srcで外部ファイルを読み込みトー�
     path.join(PRISM_RESULTS_DIR, "file-highlight.html"),
     output,
   );
+
+  const fixtureShot = await screenshotHtml(html, {
+    ...ssOpts,
+    baseDir: PRISM_FIXTURES_DIR,
+  });
+  const resultShot = await screenshotHtml(output, ssOpts);
+  assertVisualMatch(resultShot, fixtureShot, {
+    diffOutputPath: path.join(PRISM_RESULTS_DIR, "file-highlight-diff.png"),
+  });
 });

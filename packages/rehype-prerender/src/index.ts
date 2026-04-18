@@ -16,14 +16,6 @@ import type * as unist from "unist";
 import { visit, SKIP } from "unist-util-visit";
 import type { VFile } from "vfile";
 
-type WaitFunction = { type: "function"; expression: string; timeout?: number };
-type WaitNetworkIdle = {
-  type: "networkIdle";
-  idleTime?: number;
-  timeout?: number;
-};
-type WaitCondition = WaitFunction | WaitNetworkIdle;
-
 export type PrerenderSpec = {
   name?: string;
   /**
@@ -36,9 +28,12 @@ export type PrerenderSpec = {
    */
   prepare?: (tree: hast.Root) => void | Promise<void>;
   /**
-   * How to decide the browser has finished.
+   * Wait until the browser has finished running this library. Receives the
+   * live Page; typical bodies call `page.waitForFunction` against an
+   * injected done flag, or `page.waitForNetworkIdle` for libraries without
+   * a deterministic completion signal. The resolved value is ignored.
    */
-  waitUntil: WaitCondition;
+  waitUntil: (page: Page) => Promise<unknown>;
   /**
    * Runs against the live Page after waitUntil, before content extraction.
    * Typical use: unwrap iframes whose same-origin contents must be inlined
@@ -166,22 +161,6 @@ function guessContentType(filePath: string) {
   }
 }
 
-async function waitForCondition(page: Page, cond: WaitCondition) {
-  switch (cond.type) {
-    case "function":
-      await page.waitForFunction(cond.expression, {
-        timeout: cond.timeout ?? DEFAULT_TIMEOUT_MS,
-      });
-      return;
-    case "networkIdle":
-      await page.waitForNetworkIdle({
-        idleTime: cond.idleTime ?? 500,
-        timeout: cond.timeout ?? DEFAULT_TIMEOUT_MS,
-      });
-      return;
-  }
-}
-
 function patchDoctypeName(root: hast.Root) {
   root.children
     .filter((child) => child.type === "doctype" && !("name" in child))
@@ -286,7 +265,7 @@ export function prerender(options: PrerenderOptions) {
       });
 
       for (const s of applicable) {
-        await waitForCondition(page, s.waitUntil);
+        await s.waitUntil(page);
       }
 
       for (const s of applicable) {

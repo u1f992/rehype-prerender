@@ -67,11 +67,11 @@ export function twitterSpec(matchSrc: (src: string) => boolean): PrerenderSpec {
     prepare: (tree) => {
       prependToHead(tree, inlineScript(doneScript, { [MARKER]: "" }));
     },
-    waitUntil: {
-      type: "function",
-      expression: `window[Symbol.for(${JSON.stringify(DONE_KEY)})] === true`,
-      timeout: 30_000,
-    },
+    waitUntil: (page) =>
+      page.waitForFunction(
+        `window[Symbol.for(${JSON.stringify(DONE_KEY)})] === true`,
+        { timeout: 30_000 },
+      ),
     // 本物のwidgets.jsはblockquoteをplatform.twitter.com配下のクロスオリジン
     // iframeに差し替える。contentDocumentは触れないので、puppeteerの
     // ElementHandle.contentFrame()経由でフレームに入り、evaluateで中身を抜く。

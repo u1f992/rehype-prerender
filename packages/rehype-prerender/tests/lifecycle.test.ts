@@ -21,11 +21,7 @@ test("when が true を返す spec のフックが prepare → waitUntil → fin
     prepare: () => {
       calls.push("prepare");
     },
-    waitUntil: {
-      type: "function",
-      expression: "true",
-      timeout: 5_000,
-    },
+    waitUntil: (page) => page.waitForFunction("true", { timeout: 5_000 }),
     finalize: () => {
       calls.push("finalize");
     },
@@ -56,11 +52,7 @@ test("when が false を返す spec はフックが一切実行されない", as
     prepare: () => {
       calls.push("prepare");
     },
-    waitUntil: {
-      type: "function",
-      expression: "true",
-      timeout: 5_000,
-    },
+    waitUntil: (page) => page.waitForFunction("true", { timeout: 5_000 }),
     finalize: () => {
       calls.push("finalize");
     },

@@ -41,11 +41,8 @@ export function prismSpec(matchSrc: (src: string) => boolean): PrerenderSpec {
     prepare: (tree) => {
       prependToHead(tree, inlineScript(runnerScript, { [MARKER]: "" }));
     },
-    waitUntil: {
-      type: "networkIdle",
-      idleTime: 500,
-      timeout: 30_000,
-    },
+    waitUntil: (page) =>
+      page.waitForNetworkIdle({ idleTime: 500, timeout: 30_000 }),
     cleanup: (tree) => {
       removeScripts(
         tree,

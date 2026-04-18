@@ -46,11 +46,11 @@ export function mathjaxSpec(matchSrc: (src: string) => boolean): PrerenderSpec {
     prepare: (tree) => {
       prependToHead(tree, inlineScript(authorInit, { [MARKER]: "" }));
     },
-    waitUntil: {
-      type: "function",
-      expression: `window[Symbol.for(${JSON.stringify(DONE_KEY)})] === true`,
-      timeout: 60_000,
-    },
+    waitUntil: (page) =>
+      page.waitForFunction(
+        `window[Symbol.for(${JSON.stringify(DONE_KEY)})] === true`,
+        { timeout: 60_000 },
+      ),
     cleanup: (tree) => {
       removeScripts(
         tree,

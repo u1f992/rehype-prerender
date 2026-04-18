@@ -2,24 +2,20 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
 import test from "node:test";
-import url from "node:url";
 
 import rehype from "rehype";
 
 import { prerender } from "rehype-prerender";
 import {
   assertVisualMatch,
-  BROWSER_CACHE_DIR,
+  PRERENDER_TEST_OPTS,
   screenshotHtml,
+  testDirs,
 } from "test-helpers";
 
 import { mathjaxSpec } from "../src/index.ts";
 
-const __filename = url.fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
-const FIXTURES_DIR = path.join(__dirname, "fixtures");
-const RESULTS_DIR = path.join(__dirname, "results");
+const [FIXTURES_DIR, RESULTS_DIR] = testDirs(import.meta.url);
 
 const MATHJAX_CDN = "cdnjs.cloudflare.com/ajax/libs/mathjax";
 const spec = mathjaxSpec((src) => src.includes(MATHJAX_CDN));
@@ -30,8 +26,7 @@ test("MathJax: 数式がCHTML化され、<script>参照が除去される", asyn
   const result = await rehype()
     .use(prerender, {
       specs: [spec],
-      browserCacheDir: BROWSER_CACHE_DIR,
-      launchArgs: ["--no-sandbox"],
+      ...PRERENDER_TEST_OPTS,
     })
     .process({ contents: html, path: htmlPath });
   const output = String(result);
@@ -56,9 +51,8 @@ test("MathJax: 数式がCHTML化され、<script>参照が除去される", asyn
   fs.mkdirSync(RESULTS_DIR, { recursive: true });
   fs.writeFileSync(path.join(RESULTS_DIR, "mathjax.html"), output);
 
-  const ssOpts = { browserCacheDir: BROWSER_CACHE_DIR, launchArgs: ["--no-sandbox"] as const };
-  const fixtureShot = await screenshotHtml(html, ssOpts);
-  const resultShot = await screenshotHtml(output, ssOpts);
+  const fixtureShot = await screenshotHtml(html, PRERENDER_TEST_OPTS);
+  const resultShot = await screenshotHtml(output, PRERENDER_TEST_OPTS);
   assertVisualMatch(resultShot, fixtureShot, {
     diffOutputPath: path.join(RESULTS_DIR, "mathjax-diff.png"),
   });

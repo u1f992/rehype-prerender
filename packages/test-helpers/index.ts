@@ -10,7 +10,17 @@ import puppeteer, { type Page } from "puppeteer-core";
 const __filename = url.fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-export const BROWSER_CACHE_DIR = path.resolve(__dirname, "../../.cache");
+const BROWSER_CACHE_DIR = path.resolve(__dirname, "../../.cache");
+
+export const PRERENDER_TEST_OPTS = {
+  browserCacheDir: BROWSER_CACHE_DIR,
+  launchArgs: ["--no-sandbox"],
+} as const;
+
+export function testDirs(importMetaUrl: string) {
+  const dir = path.dirname(url.fileURLToPath(importMetaUrl));
+  return [path.join(dir, "fixtures"), path.join(dir, "results")] as const;
+}
 
 import {
   DEFAULT_CHROME_BUILD_ID,

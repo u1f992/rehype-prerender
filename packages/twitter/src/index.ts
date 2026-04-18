@@ -1,12 +1,11 @@
 import type * as hast from "hast";
-import { visit, SKIP } from "unist-util-visit";
 
 import {
+  hasElement,
   hasMatch,
-  hasScript,
   inlineScript,
   prependToHead,
-  removeScripts,
+  removeElements,
   type PrerenderSpec,
 } from "rehype-prerender";
 
@@ -60,16 +59,16 @@ export function twitterSpec({
   matchSrc: (src: string) => boolean;
   timeout?: number | undefined;
 }): PrerenderSpec {
-  const isTwitterScript = (el: hast.Element) => {
-    const src = el.properties?.src;
-    return typeof src === "string" && matchSrc(src);
-  };
+  const isTwitterScript = (el: hast.Element) =>
+    el.tagName === "script" &&
+    typeof el.properties?.src === "string" &&
+    matchSrc(el.properties.src);
 
   return {
     name: "twitter",
     when: (tree) =>
       hasMatch(tree, "blockquote.twitter-tweet") &&
-      hasScript(tree, isTwitterScript),
+      hasElement(tree, isTwitterScript),
     prepare: (tree) => {
       prependToHead(tree, inlineScript(doneScript, { [MARKER]: "" }));
     },
@@ -150,17 +149,14 @@ export function twitterSpec({
       }
     },
     cleanup: (tree) => {
-      removeScripts(
+      removeElements(
         tree,
-        (el) => isTwitterScript(el) || MARKER in (el.properties ?? {}),
+        (el) =>
+          isTwitterScript(el) ||
+          (el.tagName === "script" && MARKER in (el.properties ?? {})) ||
+          // widgets.js が残した非表示 iframe を除去
+          el.tagName === "iframe",
       );
-      // widgets.js が残した非表示 iframe を除去
-      visit(tree, "element", (el, index, parent) => {
-        if (el.tagName === "iframe" && index !== null && parent) {
-          parent.children.splice(index, 1);
-          return [SKIP, index];
-        }
-      });
     },
   };
 }

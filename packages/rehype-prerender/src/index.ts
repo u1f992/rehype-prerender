@@ -315,14 +315,14 @@ export function inlineScript(
 }
 
 /**
- * Remove every <script> element matching `predicate` anywhere in the tree.
+ * Remove every element matching `predicate` anywhere in the tree.
  */
-export function removeScripts(
+export function removeElements(
   root: hast.Root,
   predicate: (el: hast.Element) => boolean,
 ) {
   visit(root, "element", (el, index, parent) => {
-    if (el.tagName === "script" && predicate(el) && index !== null && parent) {
+    if (predicate(el) && index !== null && parent) {
       parent.children.splice(index, 1);
       return [SKIP, index];
     }
@@ -330,15 +330,15 @@ export function removeScripts(
 }
 
 /**
- * True if any <script> element matches predicate.
+ * True if any element matches predicate.
  */
-export function hasScript(
+export function hasElement(
   root: hast.Root,
   predicate: (el: hast.Element) => boolean,
 ) {
   let found = false;
   visit(root, "element", (el) => {
-    if (el.tagName === "script" && predicate(el)) {
+    if (predicate(el)) {
       found = true;
     }
   });

@@ -1,10 +1,10 @@
 import type * as hast from "hast";
 
 import {
-  hasScript,
+  hasElement,
   inlineScript,
   prependToHead,
-  removeScripts,
+  removeElements,
   type PrerenderSpec,
 } from "rehype-prerender";
 
@@ -36,14 +36,14 @@ export function prismSpec({
   matchSrc: (src: string) => boolean;
   timeout?: number | undefined;
 }): PrerenderSpec {
-  const isPrism = (el: hast.Element) => {
-    const src = el.properties?.src;
-    return typeof src === "string" && matchSrc(src);
-  };
+  const isPrismScript = (el: hast.Element) =>
+    el.tagName === "script" &&
+    typeof el.properties?.src === "string" &&
+    matchSrc(el.properties.src);
 
   return {
     name: "prism",
-    when: (tree) => hasScript(tree, isPrism),
+    when: (tree) => hasElement(tree, isPrismScript),
     prepare: (tree) => {
       prependToHead(tree, inlineScript(runnerScript, { [MARKER]: "" }));
     },
@@ -53,9 +53,11 @@ export function prismSpec({
         ...(timeout !== undefined && { timeout }),
       }),
     cleanup: (tree) => {
-      removeScripts(
+      removeElements(
         tree,
-        (el) => isPrism(el) || MARKER in (el.properties ?? {}),
+        (el) =>
+          isPrismScript(el) ||
+          (el.tagName === "script" && MARKER in (el.properties ?? {})),
       );
     },
   };

@@ -1,10 +1,10 @@
 import type * as hast from "hast";
 
 import {
-  hasScript,
+  hasElement,
   inlineScript,
   prependToHead,
-  removeScripts,
+  removeElements,
   type PrerenderSpec,
 } from "rehype-prerender";
 
@@ -41,14 +41,14 @@ export function mathjaxSpec({
   matchSrc: (src: string) => boolean;
   timeout?: number | undefined;
 }): PrerenderSpec {
-  const isMathJax = (el: hast.Element) => {
-    const src = el.properties?.src;
-    return typeof src === "string" && matchSrc(src);
-  };
+  const isMathJaxScript = (el: hast.Element) =>
+    el.tagName === "script" &&
+    typeof el.properties?.src === "string" &&
+    matchSrc(el.properties.src);
 
   return {
     name: "mathjax",
-    when: (tree) => hasScript(tree, isMathJax),
+    when: (tree) => hasElement(tree, isMathJaxScript),
     prepare: (tree) => {
       prependToHead(tree, inlineScript(authorInit, { [MARKER]: "" }));
     },
@@ -58,9 +58,11 @@ export function mathjaxSpec({
         timeout !== undefined ? { timeout } : {},
       ),
     cleanup: (tree) => {
-      removeScripts(
+      removeElements(
         tree,
-        (el) => isMathJax(el) || MARKER in (el.properties ?? {}),
+        (el) =>
+          isMathJaxScript(el) ||
+          (el.tagName === "script" && MARKER in (el.properties ?? {})),
       );
     },
   };

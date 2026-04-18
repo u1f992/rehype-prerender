@@ -1,11 +1,13 @@
 import assert from "node:assert/strict";
 import fs from "node:fs";
+import http from "node:http";
 import path from "node:path";
 import url from "node:url";
 
+import mime from "mime";
 import pixelmatch from "pixelmatch";
 import { PNG } from "pngjs";
-import puppeteer, { type Page } from "puppeteer-core";
+import puppeteer from "puppeteer-core";
 
 const __filename = url.fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -27,102 +29,107 @@ import {
   ensureBrowserExecutable,
 } from "rehype-prerender";
 
-const BASE_URL = "https://screenshot.invalid/";
-const ENTRY_URL = BASE_URL + "__entry__.html";
-
-const CONTENT_TYPES: Record<string, string> = {
-  ".js": "application/javascript",
-  ".mjs": "application/javascript",
-  ".css": "text/css",
-  ".html": "text/html",
-  ".json": "application/json",
+type BrowserOptions = {
+  browserCacheDir: string;
+  launchArgs?: readonly string[];
 };
 
-/**
- * Render HTML in headless Chrome and return a viewport screenshot as PNG.
- *
- * If `baseDir` is given, relative-URL requests under the fake origin are
- * resolved from that directory (same idea as the plugin's request
- * interception). External URLs (CDN etc.) pass through normally.
- */
-export async function screenshotHtml(
-  html: string,
-  options: {
-    browserCacheDir: string;
-    launchArgs?: readonly string[];
-    baseDir?: string;
-    beforeScreenshot?: (page: Page) => Promise<void>;
-  },
-): Promise<Buffer> {
+async function launch(options: BrowserOptions) {
   const executablePath = await ensureBrowserExecutable({
     browserCacheDir: options.browserCacheDir,
     chromeBuildId: DEFAULT_CHROME_BUILD_ID,
   });
-  const browser = await puppeteer.launch({
+  return puppeteer.launch({
     executablePath,
     args: [...(options.launchArgs ?? [])],
   });
+}
+
+/**
+ * Screenshot HTML that is expected to be self-contained — i.e. the output of
+ * rehype-prerender after all external libraries have been inlined. Uses
+ * `page.setContent` with no asset serving, deliberately: if rendering needs
+ * interception or a local server to match the live fixture, the plugin has
+ * failed to eliminate a runtime dependency and the test should fail.
+ */
+export async function screenshotStaticHtml(
+  html: string,
+  options: BrowserOptions,
+): Promise<Buffer> {
+  const browser = await launch(options);
   try {
     const page = await browser.newPage();
     await page.setViewport({ width: 800, height: 600 });
-
-    await page.setRequestInterception(true);
-    page.on("request", (req) => {
-      const reqUrl = req.url();
-      if (reqUrl === ENTRY_URL) {
-        req
-          .respond({
-            status: 200,
-            contentType: "text/html; charset=utf-8",
-            body: "<!doctype html><html><head></head><body></body></html>",
-          })
-          .catch(() => {});
-        return;
-      }
-      if (reqUrl.startsWith(BASE_URL) && options.baseDir) {
-        const pathname = new URL(reqUrl).pathname;
-        const decoded = decodeURIComponent(pathname.replace(/^\//, ""));
-        if (decoded) {
-          const resolved = path.resolve(options.baseDir, decoded);
-          const rel = path.relative(options.baseDir, resolved);
-          if (
-            rel &&
-            !rel.startsWith("..") &&
-            !path.isAbsolute(rel) &&
-            fs.existsSync(resolved) &&
-            fs.statSync(resolved).isFile()
-          ) {
-            const ext = path.extname(resolved).toLowerCase();
-            req
-              .respond({
-                status: 200,
-                contentType: CONTENT_TYPES[ext] ?? "text/plain",
-                body: fs.readFileSync(resolved),
-              })
-              .catch(() => {});
-            return;
-          }
-        }
-        req.respond({ status: 404, body: "" }).catch(() => {});
-        return;
-      }
-      req.continue().catch(() => {});
-    });
-
-    await page.goto(ENTRY_URL, {
-      waitUntil: "domcontentloaded",
-      timeout: 30_000,
-    });
     await page.setContent(html, { waitUntil: "load", timeout: 30_000 });
     await page.waitForNetworkIdle({ idleTime: 500, timeout: 60_000 });
-
-    if (options.beforeScreenshot) {
-      await options.beforeScreenshot(page);
-    }
-
     return (await page.screenshot()) as Buffer;
   } finally {
     await browser.close();
+  }
+}
+
+/**
+ * Live-render a fixture HTML file by serving `fixturesDir` over a throwaway
+ * local HTTP server on an ephemeral port. External URLs (CDN etc.) pass
+ * through to the real network. For use on the "before" side of a visual
+ * regression test, where the fixture legitimately depends on external
+ * libraries or sibling files.
+ */
+export async function screenshotFixture(
+  fixturePath: string,
+  options: BrowserOptions & { fixturesDir: string },
+): Promise<Buffer> {
+  const fixturesDir = path.resolve(options.fixturesDir);
+  const server = http.createServer((req, res) => {
+    const reqUrl = req.url ?? "/";
+    const pathname = decodeURIComponent(new URL(reqUrl, "http://x").pathname);
+    const relative = pathname.replace(/^\//, "");
+    const resolved = path.resolve(fixturesDir, relative);
+    const rel = path.relative(fixturesDir, resolved);
+    if (
+      !rel ||
+      rel.startsWith("..") ||
+      path.isAbsolute(rel) ||
+      !fs.existsSync(resolved) ||
+      !fs.statSync(resolved).isFile()
+    ) {
+      res.statusCode = 404;
+      res.end();
+      return;
+    }
+    res.setHeader(
+      "Content-Type",
+      mime.getType(resolved) ?? "text/plain; charset=utf-8",
+    );
+    fs.createReadStream(resolved).pipe(res);
+  });
+  await new Promise<void>((resolve) =>
+    server.listen(0, "127.0.0.1", () => resolve()),
+  );
+  const address = server.address();
+  if (!address || typeof address === "string") {
+    server.close();
+    throw new Error("Failed to bind local fixture server");
+  }
+  const port = address.port;
+
+  const fixtureRel = path.relative(fixturesDir, path.resolve(fixturePath));
+  if (fixtureRel.startsWith("..") || path.isAbsolute(fixtureRel)) {
+    server.close();
+    throw new Error(`fixturePath must live inside fixturesDir: ${fixturePath}`);
+  }
+  const fixtureUrl = `http://127.0.0.1:${port}/${fixtureRel.split(path.sep).join("/")}`;
+
+  const browser = await launch(options);
+  try {
+    const page = await browser.newPage();
+    await page.setViewport({ width: 800, height: 600 });
+    await page.goto(fixtureUrl, { waitUntil: "load", timeout: 30_000 });
+    await page.waitForNetworkIdle({ idleTime: 500, timeout: 60_000 });
+    return (await page.screenshot()) as Buffer;
+  } finally {
+    await browser.close();
+    server.close();
   }
 }
 

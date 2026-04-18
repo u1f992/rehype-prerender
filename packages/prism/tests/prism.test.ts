@@ -9,7 +9,8 @@ import { prerender } from "rehype-prerender";
 import {
   assertVisualMatch,
   PRERENDER_TEST_OPTS,
-  screenshotHtml,
+  screenshotFixture,
+  screenshotStaticHtml,
   testDirs,
 } from "test-helpers";
 
@@ -54,8 +55,11 @@ test("Prism: autoloaderが言語を取得しトークン化、Prism参照が除�
   fs.mkdirSync(RESULTS_DIR, { recursive: true });
   fs.writeFileSync(path.join(RESULTS_DIR, "autoloader.html"), output);
 
-  const fixtureShot = await screenshotHtml(html, PRERENDER_TEST_OPTS);
-  const resultShot = await screenshotHtml(output, PRERENDER_TEST_OPTS);
+  const fixtureShot = await screenshotFixture(htmlPath, {
+    ...PRERENDER_TEST_OPTS,
+    fixturesDir: FIXTURES_DIR,
+  });
+  const resultShot = await screenshotStaticHtml(output, PRERENDER_TEST_OPTS);
   assertVisualMatch(resultShot, fixtureShot, {
     diffOutputPath: path.join(RESULTS_DIR, "autoloader-diff.png"),
   });
@@ -94,11 +98,11 @@ test("Prism file-highlight + autoloader: autoloaderで言語を取得しdata-src
     output,
   );
 
-  const fixtureShot = await screenshotHtml(html, {
+  const fixtureShot = await screenshotFixture(htmlPath, {
     ...PRERENDER_TEST_OPTS,
-    baseDir: FIXTURES_DIR,
+    fixturesDir: FIXTURES_DIR,
   });
-  const resultShot = await screenshotHtml(output, PRERENDER_TEST_OPTS);
+  const resultShot = await screenshotStaticHtml(output, PRERENDER_TEST_OPTS);
   assertVisualMatch(resultShot, fixtureShot, {
     diffOutputPath: path.join(
       RESULTS_DIR,
@@ -137,11 +141,11 @@ test("Prism file-highlight: data-srcで外部ファイルを読み込みトー�
   fs.mkdirSync(RESULTS_DIR, { recursive: true });
   fs.writeFileSync(path.join(RESULTS_DIR, "file-highlight.html"), output);
 
-  const fixtureShot = await screenshotHtml(html, {
+  const fixtureShot = await screenshotFixture(htmlPath, {
     ...PRERENDER_TEST_OPTS,
-    baseDir: FIXTURES_DIR,
+    fixturesDir: FIXTURES_DIR,
   });
-  const resultShot = await screenshotHtml(output, PRERENDER_TEST_OPTS);
+  const resultShot = await screenshotStaticHtml(output, PRERENDER_TEST_OPTS);
   assertVisualMatch(resultShot, fixtureShot, {
     diffOutputPath: path.join(RESULTS_DIR, "file-highlight-diff.png"),
   });
@@ -177,8 +181,11 @@ test("Prism line-numbers: 行番号が生成されトークン化される", asy
   fs.mkdirSync(RESULTS_DIR, { recursive: true });
   fs.writeFileSync(path.join(RESULTS_DIR, "line-numbers.html"), output);
 
-  const fixtureShot = await screenshotHtml(html, PRERENDER_TEST_OPTS);
-  const resultShot = await screenshotHtml(output, PRERENDER_TEST_OPTS);
+  const fixtureShot = await screenshotFixture(htmlPath, {
+    ...PRERENDER_TEST_OPTS,
+    fixturesDir: FIXTURES_DIR,
+  });
+  const resultShot = await screenshotStaticHtml(output, PRERENDER_TEST_OPTS);
   assertVisualMatch(resultShot, fixtureShot, {
     diffOutputPath: path.join(RESULTS_DIR, "line-numbers-diff.png"),
   });

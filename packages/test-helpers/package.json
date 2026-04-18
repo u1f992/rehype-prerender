@@ -9,6 +9,7 @@
     "lint": "eslint --flag unstable_native_nodejs_ts_config --fix index.ts"
   },
   "dependencies": {
+    "mime": "^4.1.0",
     "pixelmatch": "^7.1.0",
     "pngjs": "^7.0.0",
     "puppeteer-core": "^24.41.0",

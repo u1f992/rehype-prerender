@@ -11,6 +11,7 @@ import type * as hast from "hast";
 import { fromHtml } from "hast-util-from-html";
 import { select } from "hast-util-select";
 import { toHtml } from "hast-util-to-html";
+import mime from "mime";
 import puppeteer, { type Page } from "puppeteer-core";
 import type * as unist from "unist";
 import { visit, SKIP } from "unist-util-visit";
@@ -132,35 +133,6 @@ function defaultResolveResource(pathname: string, file: VFile): string | null {
   return resolved;
 }
 
-/**
- * Pick a Content-Type heuristically. Puppeteer's request.respond is lenient
- * but some browsers are not.
- */
-function guessContentType(filePath: string) {
-  const ext = path.extname(filePath).toLowerCase();
-  switch (ext) {
-    case ".js":
-    case ".mjs":
-      return "application/javascript";
-    case ".json":
-      return "application/json";
-    case ".css":
-      return "text/css";
-    case ".html":
-    case ".htm":
-      return "text/html";
-    case ".svg":
-      return "image/svg+xml";
-    case ".png":
-      return "image/png";
-    case ".jpg":
-    case ".jpeg":
-      return "image/jpeg";
-    default:
-      return "text/plain; charset=utf-8";
-  }
-}
-
 function patchDoctypeName(root: hast.Root) {
   root.children
     .filter((child) => child.type === "doctype" && !("name" in child))
@@ -243,7 +215,8 @@ export function prerender(options: PrerenderOptions) {
             req
               .respond({
                 status: 200,
-                contentType: guessContentType(fsPath),
+                contentType:
+                  mime.getType(fsPath) ?? "text/plain; charset=utf-8",
                 body: fs.readFileSync(fsPath),
               })
               .catch(() => {});

@@ -53,9 +53,7 @@ const doneScript = `
  *   and iframe URL. Return `true` for Twitter-related URLs so they can
  *   be detected and removed after pre-rendering.
  */
-export function twitterSpec(
-  matchSrc: (src: string) => boolean,
-): PrerenderSpec {
+export function twitterSpec(matchSrc: (src: string) => boolean): PrerenderSpec {
   const isTwitterScript = (el: hast.Element) => {
     const src = el.properties?.src;
     return typeof src === "string" && matchSrc(src);

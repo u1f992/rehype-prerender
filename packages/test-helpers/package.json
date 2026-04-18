@@ -4,6 +4,10 @@
   "private": true,
   "type": "module",
   "main": "./index.ts",
+  "scripts": {
+    "format": "prettier --write index.ts",
+    "lint": "eslint --flag unstable_native_nodejs_ts_config --fix index.ts"
+  },
   "dependencies": {
     "pixelmatch": "^7.1.0",
     "pngjs": "^7.0.0",

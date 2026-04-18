@@ -5,6 +5,8 @@
   "main": "./dist/index.js",
   "scripts": {
     "build": "tsc && tsc --project tests/tsconfig.json",
+    "format": "prettier --write src tests",
+    "lint": "eslint --flag unstable_native_nodejs_ts_config --fix src tests",
     "test": "node --test \"tests/**/*.test.ts\""
   },
   "dependencies": {

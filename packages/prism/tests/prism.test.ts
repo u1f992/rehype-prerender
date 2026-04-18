@@ -20,9 +20,7 @@ const [FIXTURES_DIR, RESULTS_DIR] = testDirs(import.meta.url);
 const PRISM_CDN = "cdnjs.cloudflare.com/ajax/libs/prism";
 const spec = prismSpec((src) => src.includes(PRISM_CDN));
 
-
-
-test("Prism: autoloaderが言語を取得しトークン化、Prism参照が除去される", async (t) => {
+test("Prism: autoloaderが言語を取得しトークン化、Prism参照が除去される", async () => {
   const htmlPath = path.join(FIXTURES_DIR, "autoloader.html");
   const html = fs.readFileSync(htmlPath, "utf-8");
 
@@ -102,7 +100,10 @@ test("Prism file-highlight + autoloader: autoloaderで言語を取得しdata-src
   });
   const resultShot = await screenshotHtml(output, PRERENDER_TEST_OPTS);
   assertVisualMatch(resultShot, fixtureShot, {
-    diffOutputPath: path.join(RESULTS_DIR, "file-highlight-autoloader-diff.png"),
+    diffOutputPath: path.join(
+      RESULTS_DIR,
+      "file-highlight-autoloader-diff.png",
+    ),
   });
 });
 
@@ -134,10 +135,7 @@ test("Prism file-highlight: data-srcで外部ファイルを読み込みトー�
   );
 
   fs.mkdirSync(RESULTS_DIR, { recursive: true });
-  fs.writeFileSync(
-    path.join(RESULTS_DIR, "file-highlight.html"),
-    output,
-  );
+  fs.writeFileSync(path.join(RESULTS_DIR, "file-highlight.html"), output);
 
   const fixtureShot = await screenshotHtml(html, {
     ...PRERENDER_TEST_OPTS,

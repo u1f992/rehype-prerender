@@ -4,7 +4,9 @@
   "type": "module",
   "main": "./dist/index.js",
   "scripts": {
-    "build": "tsc"
+    "build": "tsc",
+    "format": "prettier --write src",
+    "lint": "eslint --flag unstable_native_nodejs_ts_config --fix src"
   },
   "dependencies": {
     "@puppeteer/browsers": "^2.13.0",

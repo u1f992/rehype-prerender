@@ -1,14 +1,28 @@
 {
+  "type": "module",
   "private": true,
   "workspaces": [
     "packages/*"
   ],
+  "//": {
+    "scripts.lint": [
+      "see https://github.com/eslint/eslint/issues/19357",
+      "see https://github.com/eslint/eslint/issues/19985"
+    ]
+  },
   "scripts": {
     "build": "npm run build --workspaces --if-present",
+    "format": "prettier --write eslint.config.ts prettier.config.ts && npm run format --workspaces --if-present",
+    "lint": "eslint --flag unstable_native_nodejs_ts_config --fix eslint.config.ts prettier.config.ts && npm run lint --workspaces --if-present",
     "test": "npm test --workspaces --if-present"
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
     "@types/node": "^22.19.17",
-    "typescript": "^6.0.3"
+    "eslint": "^10.2.1",
+    "globals": "^17.5.0",
+    "prettier": "^3.8.3",
+    "typescript": "^6.0.3",
+    "typescript-eslint": "^8.58.2"
   }
 }

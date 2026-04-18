@@ -18,7 +18,7 @@ import { prismSpec } from "../src/index.ts";
 const [FIXTURES_DIR, RESULTS_DIR] = testDirs(import.meta.url);
 
 const PRISM_CDN = "cdnjs.cloudflare.com/ajax/libs/prism";
-const spec = prismSpec((src) => src.includes(PRISM_CDN));
+const spec = prismSpec({ matchSrc: (src) => src.includes(PRISM_CDN) });
 
 test("Prism: autoloaderが言語を取得しトークン化、Prism参照が除去される", async () => {
   const htmlPath = path.join(FIXTURES_DIR, "autoloader.html");

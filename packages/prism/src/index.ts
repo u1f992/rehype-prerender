@@ -29,7 +29,13 @@ window.addEventListener('load', function () {
  *   Return `true` for Prism-related scripts so they can be detected and
  *   removed after pre-rendering.
  */
-export function prismSpec(matchSrc: (src: string) => boolean): PrerenderSpec {
+export function prismSpec({
+  matchSrc,
+  timeout,
+}: {
+  matchSrc: (src: string) => boolean;
+  timeout?: number | undefined;
+}): PrerenderSpec {
   const isPrism = (el: hast.Element) => {
     const src = el.properties?.src;
     return typeof src === "string" && matchSrc(src);
@@ -42,7 +48,10 @@ export function prismSpec(matchSrc: (src: string) => boolean): PrerenderSpec {
       prependToHead(tree, inlineScript(runnerScript, { [MARKER]: "" }));
     },
     waitUntil: (page) =>
-      page.waitForNetworkIdle({ idleTime: 500, timeout: 30_000 }),
+      page.waitForNetworkIdle({
+        idleTime: 500,
+        ...(timeout !== undefined && { timeout }),
+      }),
     cleanup: (tree) => {
       removeScripts(
         tree,

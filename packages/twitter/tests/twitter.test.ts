@@ -17,7 +17,9 @@ import { twitterSpec } from "../src/index.ts";
 
 const [FIXTURES_DIR, RESULTS_DIR] = testDirs(import.meta.url);
 
-const spec = twitterSpec((src) => src.includes("platform.twitter.com/"));
+const spec = twitterSpec({
+  matchSrc: (src) => src.includes("platform.twitter.com/"),
+});
 
 test("Twitter: 本物のwidgets.jsでjack/status/20を焼き、script参照が消える", async () => {
   const htmlPath = path.join(FIXTURES_DIR, "twitter.html");

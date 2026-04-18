@@ -53,7 +53,13 @@ const doneScript = `
  *   and iframe URL. Return `true` for Twitter-related URLs so they can
  *   be detected and removed after pre-rendering.
  */
-export function twitterSpec(matchSrc: (src: string) => boolean): PrerenderSpec {
+export function twitterSpec({
+  matchSrc,
+  timeout,
+}: {
+  matchSrc: (src: string) => boolean;
+  timeout?: number | undefined;
+}): PrerenderSpec {
   const isTwitterScript = (el: hast.Element) => {
     const src = el.properties?.src;
     return typeof src === "string" && matchSrc(src);
@@ -70,7 +76,7 @@ export function twitterSpec(matchSrc: (src: string) => boolean): PrerenderSpec {
     waitUntil: (page) =>
       page.waitForFunction(
         `window[Symbol.for(${JSON.stringify(DONE_KEY)})] === true`,
-        { timeout: 30_000 },
+        timeout !== undefined ? { timeout } : {},
       ),
     // 本物のwidgets.jsはblockquoteをplatform.twitter.com配下のクロスオリジン
     // iframeに差し替える。contentDocumentは触れないので、puppeteerの

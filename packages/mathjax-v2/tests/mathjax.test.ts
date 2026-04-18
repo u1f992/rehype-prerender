@@ -18,7 +18,7 @@ import { mathjaxSpec } from "../src/index.ts";
 const [FIXTURES_DIR, RESULTS_DIR] = testDirs(import.meta.url);
 
 const MATHJAX_CDN = "cdnjs.cloudflare.com/ajax/libs/mathjax";
-const spec = mathjaxSpec((src) => src.includes(MATHJAX_CDN));
+const spec = mathjaxSpec({ matchSrc: (src) => src.includes(MATHJAX_CDN) });
 
 test("MathJax: 数式がCHTML化され、<script>参照が除去される", async () => {
   const htmlPath = path.join(FIXTURES_DIR, "mathjax.html");

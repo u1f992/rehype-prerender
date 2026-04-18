@@ -34,7 +34,13 @@ const authorInit = `
  *   Return `true` for MathJax-related scripts so they can be detected and
  *   removed after pre-rendering.
  */
-export function mathjaxSpec(matchSrc: (src: string) => boolean): PrerenderSpec {
+export function mathjaxSpec({
+  matchSrc,
+  timeout,
+}: {
+  matchSrc: (src: string) => boolean;
+  timeout?: number | undefined;
+}): PrerenderSpec {
   const isMathJax = (el: hast.Element) => {
     const src = el.properties?.src;
     return typeof src === "string" && matchSrc(src);
@@ -49,7 +55,7 @@ export function mathjaxSpec(matchSrc: (src: string) => boolean): PrerenderSpec {
     waitUntil: (page) =>
       page.waitForFunction(
         `window[Symbol.for(${JSON.stringify(DONE_KEY)})] === true`,
-        { timeout: 60_000 },
+        timeout !== undefined ? { timeout } : {},
       ),
     cleanup: (tree) => {
       removeScripts(

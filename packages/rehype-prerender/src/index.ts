@@ -29,12 +29,12 @@ export type PrerenderSpec = {
   /**
    * Whether this spec applies to the given tree. Runs before any mutation.
    */
-  when: (tree: hast.Root) => boolean;
+  when: (tree: hast.Root) => boolean | Promise<boolean>;
   /**
    * Mutate the hast tree before serialization. Typical use: inject a
    * done-flag script into <head>.
    */
-  prepare?: (tree: hast.Root) => void;
+  prepare?: (tree: hast.Root) => void | Promise<void>;
   /**
    * How to decide the browser has finished.
    */
@@ -44,12 +44,12 @@ export type PrerenderSpec = {
    * Typical use: unwrap iframes whose same-origin contents must be inlined
    * before serialization strips them.
    */
-  finalize?: (page: Page) => Promise<void>;
+  finalize?: (page: Page) => void | Promise<void>;
   /**
    * Mutate the re-parsed hast tree after extraction. Typical use: remove the
    * injected done-flag script and the library's own <script> references.
    */
-  cleanup?: (tree: hast.Root) => void;
+  cleanup?: (tree: hast.Root) => void | Promise<void>;
 };
 
 type PrerenderOptions = {
@@ -216,13 +216,18 @@ export function prerender(options: PrerenderOptions) {
 
   return async (node: unist.Node, file: VFile) => {
     const tree = node as hast.Root;
-    const applicable = specs.filter((s) => s.when(tree));
+    const applicable: PrerenderSpec[] = [];
+    for (const s of specs) {
+      if (await s.when(tree)) {
+        applicable.push(s);
+      }
+    }
     if (applicable.length === 0) {
       return tree;
     }
 
     for (const s of applicable) {
-      s.prepare?.(tree);
+      await s.prepare?.(tree);
     }
 
     const html = toHtml(tree);
@@ -299,7 +304,7 @@ export function prerender(options: PrerenderOptions) {
     patchDoctypeName(rendered);
 
     for (const s of applicable) {
-      s.cleanup?.(rendered);
+      await s.cleanup?.(rendered);
     }
 
     return rendered;

@@ -7,7 +7,7 @@ import { prerender, type PrerenderSpec } from "../src/index.ts";
 import { PRERENDER_TEST_OPTS } from "test-helpers";
 
 const HTML =
-  '<!doctype html><html><head></head><body><p>hello</p></body></html>';
+  "<!doctype html><html><head></head><body><p>hello</p></body></html>";
 
 test("when が true を返す spec のフックが prepare → waitUntil → finalize → cleanup の順に1回ずつ実行される", async () => {
   const calls: string[] = [];
@@ -26,7 +26,7 @@ test("when が true を返す spec のフックが prepare → waitUntil → fin
       expression: "true",
       timeout: 5_000,
     },
-    finalize: async () => {
+    finalize: () => {
       calls.push("finalize");
     },
     cleanup: () => {
@@ -61,7 +61,7 @@ test("when が false を返す spec はフックが一切実行されない", as
       expression: "true",
       timeout: 5_000,
     },
-    finalize: async () => {
+    finalize: () => {
       calls.push("finalize");
     },
     cleanup: () => {

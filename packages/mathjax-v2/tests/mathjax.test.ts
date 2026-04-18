@@ -7,10 +7,8 @@ import rehype from "rehype";
 
 import { prerender } from "rehype-prerender";
 import {
-  assertVisualMatch,
+  assertVisualMatchRender,
   PRERENDER_TEST_OPTS,
-  screenshotFixture,
-  screenshotStaticHtml,
   testDirs,
 } from "test-helpers";
 
@@ -52,12 +50,9 @@ test("MathJax: 数式がCHTML化され、<script>参照が除去される", asyn
   fs.mkdirSync(RESULTS_DIR, { recursive: true });
   fs.writeFileSync(path.join(RESULTS_DIR, "mathjax.html"), output);
 
-  const fixtureShot = await screenshotFixture(htmlPath, {
+  await assertVisualMatchRender(htmlPath, output, {
     ...PRERENDER_TEST_OPTS,
     fixturesDir: FIXTURES_DIR,
-  });
-  const resultShot = await screenshotStaticHtml(output, PRERENDER_TEST_OPTS);
-  assertVisualMatch(resultShot, fixtureShot, {
     diffOutputPath: path.join(RESULTS_DIR, "mathjax-diff.png"),
   });
 });

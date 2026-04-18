@@ -52,7 +52,7 @@ async function launch(options: BrowserOptions) {
  * interception or a local server to match the live fixture, the plugin has
  * failed to eliminate a runtime dependency and the test should fail.
  */
-export async function screenshotStaticHtml(
+async function screenshotStaticHtml(
   html: string,
   options: BrowserOptions,
 ): Promise<Buffer> {
@@ -75,7 +75,7 @@ export async function screenshotStaticHtml(
  * regression test, where the fixture legitimately depends on external
  * libraries or sibling files.
  */
-export async function screenshotFixture(
+async function screenshotFixture(
   fixturePath: string,
   options: BrowserOptions & { fixturesDir: string },
 ): Promise<Buffer> {
@@ -137,7 +137,7 @@ export async function screenshotFixture(
  * Assert that two PNG screenshots are visually equivalent.
  * Writes a diff image to `diffOutputPath` on failure.
  */
-export function assertVisualMatch(
+function assertVisualMatch(
   actual: Buffer,
   expected: Buffer,
   options?: { maxDiffPercent?: number; diffOutputPath?: string },
@@ -186,4 +186,32 @@ export function assertVisualMatch(
         `(${numDiffPixels}/${totalPixels})`,
     );
   }
+}
+
+/**
+ * Assert that rehype-prerender's output, rendered as a self-contained static
+ * HTML document, matches what the fixture looks like when rendered live
+ * (with CDN scripts and local sibling files served from `fixturesDir`).
+ */
+export async function assertVisualMatchRender(
+  fixturePath: string,
+  prerenderedHtml: string,
+  options: BrowserOptions & {
+    fixturesDir: string;
+    maxDiffPercent?: number;
+    diffOutputPath?: string;
+  },
+): Promise<void> {
+  const [fixtureShot, resultShot] = await Promise.all([
+    screenshotFixture(fixturePath, options),
+    screenshotStaticHtml(prerenderedHtml, options),
+  ]);
+  assertVisualMatch(resultShot, fixtureShot, {
+    ...(options.maxDiffPercent !== undefined
+      ? { maxDiffPercent: options.maxDiffPercent }
+      : {}),
+    ...(options.diffOutputPath !== undefined
+      ? { diffOutputPath: options.diffOutputPath }
+      : {}),
+  });
 }

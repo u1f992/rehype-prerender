@@ -7,10 +7,8 @@ import rehype from "rehype";
 
 import { prerender } from "rehype-prerender";
 import {
-  assertVisualMatch,
+  assertVisualMatchRender,
   PRERENDER_TEST_OPTS,
-  screenshotFixture,
-  screenshotStaticHtml,
   testDirs,
 } from "test-helpers";
 
@@ -54,12 +52,9 @@ test("Twitter: 本物のwidgets.jsでjack/status/20を焼き、script参照が�
   fs.mkdirSync(RESULTS_DIR, { recursive: true });
   fs.writeFileSync(path.join(RESULTS_DIR, "twitter.html"), output);
 
-  const fixtureShot = await screenshotFixture(htmlPath, {
+  await assertVisualMatchRender(htmlPath, output, {
     ...PRERENDER_TEST_OPTS,
     fixturesDir: FIXTURES_DIR,
-  });
-  const resultShot = await screenshotStaticHtml(output, PRERENDER_TEST_OPTS);
-  assertVisualMatch(resultShot, fixtureShot, {
     diffOutputPath: path.join(RESULTS_DIR, "twitter-diff.png"),
   });
 });

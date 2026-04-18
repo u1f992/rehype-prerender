@@ -1,0 +1,22 @@
+{
+  "name": "rehype-prerender",
+  "version": "0.0.0",
+  "type": "module",
+  "main": "./dist/index.js",
+  "scripts": {
+    "build": "tsc"
+  },
+  "dependencies": {
+    "@puppeteer/browsers": "^2.13.0",
+    "hast-util-from-html": "^1.0.2",
+    "hast-util-select": "^5.0.5",
+    "hast-util-to-html": "^8.0.4",
+    "puppeteer-core": "^24.41.0",
+    "unist-util-visit": "^4.1.2"
+  },
+  "devDependencies": {
+    "@types/hast": "^2.3.10",
+    "@types/unist": "^2.0.11",
+    "vfile": "^4.2.1"
+  }
+}

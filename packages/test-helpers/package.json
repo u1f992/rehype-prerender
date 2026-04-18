@@ -1,0 +1,16 @@
+{
+  "name": "test-helpers",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "./index.ts",
+  "dependencies": {
+    "pixelmatch": "^7.1.0",
+    "pngjs": "^7.0.0",
+    "puppeteer-core": "^24.41.0",
+    "rehype-prerender": "0.0.0"
+  },
+  "devDependencies": {
+    "@types/pngjs": "^6.0.5"
+  }
+}

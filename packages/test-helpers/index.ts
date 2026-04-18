@@ -10,16 +10,12 @@ import puppeteer, { type Page } from "puppeteer-core";
 const __filename = url.fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-export const BROWSER_CACHE_DIR = path.resolve(__dirname, ".cache");
-
-export const FIXTURES_DIR = path.join(__dirname, "fixtures");
-
-export const RESULTS_DIR = path.join(__dirname, "results");
+export const BROWSER_CACHE_DIR = path.resolve(__dirname, "../../.cache");
 
 import {
   DEFAULT_CHROME_BUILD_ID,
   ensureBrowserExecutable,
-} from "../src/index.ts";
+} from "rehype-prerender";
 
 const BASE_URL = "https://screenshot.invalid/";
 const ENTRY_URL = BASE_URL + "__entry__.html";

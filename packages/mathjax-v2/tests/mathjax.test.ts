@@ -2,75 +2,24 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
 import test from "node:test";
+import url from "node:url";
 
-import type * as hast from "hast";
 import rehype from "rehype";
 
-import {
-  hasScript,
-  inlineScript,
-  prependToHead,
-  prerender,
-  removeScripts,
-  type PrerenderSpec,
-} from "../src/index.ts";
+import { prerender } from "rehype-prerender";
 import {
   assertVisualMatch,
   BROWSER_CACHE_DIR,
-  FIXTURES_DIR,
-  RESULTS_DIR,
   screenshotHtml,
-} from "./helpers.ts";
+} from "test-helpers";
 
-/**
- * Recognize the MathJax CDN reference VFM emits, as well as any extension
- * scripts MathJax itself appended to the DOM during execution.
- */
-const isMathJax = (el: hast.Element) => {
-  const src = el.properties?.src;
-  return (
-    typeof src === "string" &&
-    src.includes("cdnjs.cloudflare.com/ajax/libs/mathjax")
-  );
-};
+import { mathjaxSpec } from "../src/index.ts";
 
-const DONE_KEY = "mathjax-prerender-done";
-const MARKER = "dataPrerenderMathjax";
+const __filename = url.fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
-const authorInit = `
-(function () {
-  var existing = window.MathJax || {};
-  var prev = typeof existing.AuthorInit === "function" ? existing.AuthorInit : null;
-  existing.AuthorInit = function () {
-    if (prev) prev.apply(this, arguments);
-    MathJax.Hub.Register.StartupHook("End", function () {
-      MathJax.Hub.Queue(function () {
-        window[Symbol.for(${JSON.stringify(DONE_KEY)})] = true;
-      });
-    });
-  };
-  window.MathJax = existing;
-})();
-`;
-
-const mathjaxSpec: PrerenderSpec = {
-  name: "mathjax",
-  when: (tree) => hasScript(tree, isMathJax),
-  prepare: (tree) => {
-    prependToHead(tree, inlineScript(authorInit, { [MARKER]: "" }));
-  },
-  waitUntil: {
-    type: "function",
-    expression: `window[Symbol.for(${JSON.stringify(DONE_KEY)})] === true`,
-    timeout: 60_000,
-  },
-  cleanup: (tree) => {
-    removeScripts(
-      tree,
-      (el) => isMathJax(el) || MARKER in (el.properties ?? {}),
-    );
-  },
-};
+const FIXTURES_DIR = path.join(__dirname, "fixtures");
+const RESULTS_DIR = path.join(__dirname, "results");
 
 test("MathJax: 数式がCHTML化され、<script>参照が除去される", async () => {
   const htmlPath = path.join(FIXTURES_DIR, "mathjax.html");

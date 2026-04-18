@@ -1,27 +1,25 @@
-// @ts-check
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
 import test from "node:test";
+import url from "node:url";
 
-import type * as hast from "hast";
 import rehype from "rehype";
 
-import {
-  hasMatch,
-  inlineScript,
-  prependToHead,
-  prerender,
-  removeScripts,
-  type PrerenderSpec,
-} from "../src/index.ts";
+import { prerender } from "rehype-prerender";
 import {
   assertVisualMatch,
   BROWSER_CACHE_DIR,
-  FIXTURES_DIR,
-  RESULTS_DIR,
   screenshotHtml,
-} from "./helpers.ts";
+} from "test-helpers";
+
+import { fileHighlightSpec, prismSpec } from "../src/index.ts";
+
+const __filename = url.fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+const FIXTURES_DIR = path.join(__dirname, "fixtures");
+const RESULTS_DIR = path.join(__dirname, "results");
 
 const ssOpts = {
   browserCacheDir: BROWSER_CACHE_DIR,
@@ -31,77 +29,6 @@ const ssOpts = {
 const PRISM_RESULTS_DIR = path.join(RESULTS_DIR, "prism");
 
 const PRISM_FIXTURES_DIR = path.join(FIXTURES_DIR, "prism");
-
-const PRISM_CDN = "cdnjs.cloudflare.com/ajax/libs/prism";
-const MARKER = "dataPrerenderPrism";
-
-const isPrismScript = (el: hast.Element) => {
-  const src = el.properties?.src;
-  return typeof src === "string" && src.includes(PRISM_CDN);
-};
-
-const runnerScript = `
-window.Prism = window.Prism || {};
-window.Prism.manual = true;
-
-window.addEventListener('load', function () {
-  if (window.Prism && typeof Prism.highlightAll === 'function') {
-    Prism.highlightAll(false);
-  }
-});
-`;
-
-const prismSpec: PrerenderSpec = {
-  name: "prism",
-  when: (tree) =>
-    hasMatch(tree, 'pre > code[class*="language-"]') ||
-    hasMatch(tree, 'pre[class*="language-"] > code'),
-  prepare: (tree) => {
-    prependToHead(tree, inlineScript(runnerScript, { [MARKER]: "" }));
-  },
-  waitUntil: {
-    type: "networkIdle",
-    idleTime: 500,
-    timeout: 30_000,
-  },
-  cleanup: (tree) => {
-    removeScripts(
-      tree,
-      (el) => isPrismScript(el) || MARKER in (el.properties ?? {}),
-    );
-  },
-};
-
-const fileHighlightRunnerScript = `
-window.addEventListener('load', function () {
-  if (window.Prism && typeof Prism.highlightAll === 'function') {
-    Prism.highlightAll(false);
-  }
-});
-`;
-
-const fileHighlightSpec: PrerenderSpec = {
-  name: "prism-file-highlight",
-  when: (tree) => hasMatch(tree, "pre[data-src]"),
-  prepare: (tree) => {
-    prependToHead(
-      tree,
-      inlineScript(fileHighlightRunnerScript, { [MARKER]: "" }),
-    );
-  },
-  waitUntil: {
-    type: "function",
-    expression: `document.querySelectorAll('pre[data-src]').length > 0
-      && document.querySelectorAll('pre[data-src]:not([data-src-status="loaded"])').length === 0`,
-    timeout: 30_000,
-  },
-  cleanup: (tree) => {
-    removeScripts(
-      tree,
-      (el) => isPrismScript(el) || MARKER in (el.properties ?? {}),
-    );
-  },
-};
 
 test("Prism: autoloaderが言語を取得しトークン化、Prism参照が除去される", async (t) => {
   const htmlPath = path.join(PRISM_FIXTURES_DIR, "autoloader.html");

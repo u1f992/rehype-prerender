@@ -1,0 +1,18 @@
+{
+  "name": "rehype-prerender-prism",
+  "version": "0.0.0",
+  "type": "module",
+  "main": "./dist/index.js",
+  "scripts": {
+    "build": "tsc && tsc --project tests/tsconfig.json",
+    "test": "node --test \"tests/**/*.test.ts\""
+  },
+  "dependencies": {
+    "rehype-prerender": "0.0.0"
+  },
+  "devDependencies": {
+    "test-helpers": "0.0.0",
+    "@types/hast": "^2.3.10",
+    "rehype": "^11.0.0"
+  }
+}

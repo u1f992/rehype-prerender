@@ -18,7 +18,6 @@ import { visit, SKIP } from "unist-util-visit";
 import type { VFile } from "vfile";
 
 export type PrerenderSpec = {
-  name?: string;
   /**
    * Whether this spec applies to the given tree. Runs before any mutation.
    */

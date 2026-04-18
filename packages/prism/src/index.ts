@@ -42,7 +42,6 @@ export function prismSpec({
     matchSrc(el.properties.src);
 
   return {
-    name: "prism",
     when: (tree) => hasElement(tree, isPrismScript),
     prepare: (tree) => {
       prependToHead(tree, inlineScript(runnerScript, { [MARKER]: "" }));

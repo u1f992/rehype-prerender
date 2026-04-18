@@ -13,7 +13,6 @@ test("when が true を返す spec のフックが prepare → waitUntil → fin
   const calls: string[] = [];
 
   const spec: PrerenderSpec = {
-    name: "lifecycle-test",
     when: () => {
       calls.push("when");
       return true;
@@ -44,7 +43,6 @@ test("when が false を返す spec はフックが一切実行されない", as
   const calls: string[] = [];
 
   const spec: PrerenderSpec = {
-    name: "skipped-test",
     when: () => {
       calls.push("when");
       return false;

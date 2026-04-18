@@ -47,7 +47,6 @@ export function mathjaxSpec({
     matchSrc(el.properties.src);
 
   return {
-    name: "mathjax",
     when: (tree) => hasElement(tree, isMathJaxScript),
     prepare: (tree) => {
       prependToHead(tree, inlineScript(authorInit, { [MARKER]: "" }));

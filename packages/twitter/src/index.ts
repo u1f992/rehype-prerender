@@ -65,7 +65,6 @@ export function twitterSpec({
     matchSrc(el.properties.src);
 
   return {
-    name: "twitter",
     when: (tree) =>
       hasMatch(tree, "blockquote.twitter-tweet") &&
       hasElement(tree, isTwitterScript),

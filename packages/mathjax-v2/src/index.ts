@@ -8,18 +8,6 @@ import {
   type PrerenderSpec,
 } from "rehype-prerender";
 
-/**
- * Recognize the MathJax CDN reference VFM emits, as well as any extension
- * scripts MathJax itself appended to the DOM during execution.
- */
-const isMathJax = (el: hast.Element) => {
-  const src = el.properties?.src;
-  return (
-    typeof src === "string" &&
-    src.includes("cdnjs.cloudflare.com/ajax/libs/mathjax")
-  );
-};
-
 const DONE_KEY = "mathjax-prerender-done";
 const MARKER = "dataPrerenderMathjax";
 
@@ -39,21 +27,35 @@ const authorInit = `
 })();
 `;
 
-export const mathjaxSpec: PrerenderSpec = {
-  name: "mathjax",
-  when: (tree) => hasScript(tree, isMathJax),
-  prepare: (tree) => {
-    prependToHead(tree, inlineScript(authorInit, { [MARKER]: "" }));
-  },
-  waitUntil: {
-    type: "function",
-    expression: `window[Symbol.for(${JSON.stringify(DONE_KEY)})] === true`,
-    timeout: 60_000,
-  },
-  cleanup: (tree) => {
-    removeScripts(
-      tree,
-      (el) => isMathJax(el) || MARKER in (el.properties ?? {}),
-    );
-  },
-};
+/**
+ * Create a PrerenderSpec for MathJax v2.
+ *
+ * @param matchSrc - Predicate applied to each `<script src="…">` value.
+ *   Return `true` for MathJax-related scripts so they can be detected and
+ *   removed after pre-rendering.
+ */
+export function mathjaxSpec(matchSrc: (src: string) => boolean): PrerenderSpec {
+  const isMathJax = (el: hast.Element) => {
+    const src = el.properties?.src;
+    return typeof src === "string" && matchSrc(src);
+  };
+
+  return {
+    name: "mathjax",
+    when: (tree) => hasScript(tree, isMathJax),
+    prepare: (tree) => {
+      prependToHead(tree, inlineScript(authorInit, { [MARKER]: "" }));
+    },
+    waitUntil: {
+      type: "function",
+      expression: `window[Symbol.for(${JSON.stringify(DONE_KEY)})] === true`,
+      timeout: 60_000,
+    },
+    cleanup: (tree) => {
+      removeScripts(
+        tree,
+        (el) => isMathJax(el) || MARKER in (el.properties ?? {}),
+      );
+    },
+  };
+}

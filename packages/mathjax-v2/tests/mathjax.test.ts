@@ -21,12 +21,15 @@ const __dirname = path.dirname(__filename);
 const FIXTURES_DIR = path.join(__dirname, "fixtures");
 const RESULTS_DIR = path.join(__dirname, "results");
 
+const MATHJAX_CDN = "cdnjs.cloudflare.com/ajax/libs/mathjax";
+const spec = mathjaxSpec((src) => src.includes(MATHJAX_CDN));
+
 test("MathJax: 数式がCHTML化され、<script>参照が除去される", async () => {
   const htmlPath = path.join(FIXTURES_DIR, "mathjax.html");
   const html = fs.readFileSync(htmlPath, "utf-8");
   const result = await rehype()
     .use(prerender, {
-      specs: [mathjaxSpec],
+      specs: [spec],
       browserCacheDir: BROWSER_CACHE_DIR,
       launchArgs: ["--no-sandbox"],
     })

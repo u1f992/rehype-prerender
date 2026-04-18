@@ -21,13 +21,15 @@ const __dirname = path.dirname(__filename);
 const FIXTURES_DIR = path.join(__dirname, "fixtures");
 const RESULTS_DIR = path.join(__dirname, "results");
 
+const spec = twitterSpec((src) => src.includes("platform.twitter.com/"));
+
 test("Twitter: 本物のwidgets.jsでjack/status/20を焼き、script参照が消える", async () => {
   const htmlPath = path.join(FIXTURES_DIR, "twitter.html");
   const html = fs.readFileSync(htmlPath, "utf-8");
 
   const result = await rehype()
     .use(prerender, {
-      specs: [twitterSpec],
+      specs: [spec],
       browserCacheDir: BROWSER_CACHE_DIR,
       launchArgs: ["--no-sandbox"],
     })

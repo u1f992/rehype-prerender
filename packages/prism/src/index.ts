@@ -1,22 +1,16 @@
 import type * as hast from "hast";
 
 import {
-  hasMatch,
+  hasScript,
   inlineScript,
   prependToHead,
   removeScripts,
   type PrerenderSpec,
 } from "rehype-prerender";
 
-export const PRISM_CDN = "cdnjs.cloudflare.com/ajax/libs/prism";
-export const MARKER = "dataPrerenderPrism";
+const MARKER = "dataPrerenderPrism";
 
-export const isPrismScript = (el: hast.Element) => {
-  const src = el.properties?.src;
-  return typeof src === "string" && src.includes(PRISM_CDN);
-};
-
-export const runnerScript = `
+const runnerScript = `
 window.Prism = window.Prism || {};
 window.Prism.manual = true;
 
@@ -27,54 +21,36 @@ window.addEventListener('load', function () {
 });
 `;
 
-export const fileHighlightRunnerScript = `
-window.addEventListener('load', function () {
-  if (window.Prism && typeof Prism.highlightAll === 'function') {
-    Prism.highlightAll(false);
-  }
-});
-`;
+/**
+ * Create a PrerenderSpec for Prism. Handles any combination of plugins
+ * (autoloader, file-highlight, etc.) with a single spec.
+ *
+ * @param matchSrc - Predicate applied to each `<script src="…">` value.
+ *   Return `true` for Prism-related scripts so they can be detected and
+ *   removed after pre-rendering.
+ */
+export function prismSpec(matchSrc: (src: string) => boolean): PrerenderSpec {
+  const isPrism = (el: hast.Element) => {
+    const src = el.properties?.src;
+    return typeof src === "string" && matchSrc(src);
+  };
 
-export const prismSpec: PrerenderSpec = {
-  name: "prism",
-  when: (tree) =>
-    hasMatch(tree, 'pre > code[class*="language-"]') ||
-    hasMatch(tree, 'pre[class*="language-"] > code'),
-  prepare: (tree) => {
-    prependToHead(tree, inlineScript(runnerScript, { [MARKER]: "" }));
-  },
-  waitUntil: {
-    type: "networkIdle",
-    idleTime: 500,
-    timeout: 30_000,
-  },
-  cleanup: (tree) => {
-    removeScripts(
-      tree,
-      (el) => isPrismScript(el) || MARKER in (el.properties ?? {}),
-    );
-  },
-};
-
-export const fileHighlightSpec: PrerenderSpec = {
-  name: "prism-file-highlight",
-  when: (tree) => hasMatch(tree, "pre[data-src]"),
-  prepare: (tree) => {
-    prependToHead(
-      tree,
-      inlineScript(fileHighlightRunnerScript, { [MARKER]: "" }),
-    );
-  },
-  waitUntil: {
-    type: "function",
-    expression: `document.querySelectorAll('pre[data-src]').length > 0
-      && document.querySelectorAll('pre[data-src]:not([data-src-status="loaded"])').length === 0`,
-    timeout: 30_000,
-  },
-  cleanup: (tree) => {
-    removeScripts(
-      tree,
-      (el) => isPrismScript(el) || MARKER in (el.properties ?? {}),
-    );
-  },
-};
+  return {
+    name: "prism",
+    when: (tree) => hasScript(tree, isPrism),
+    prepare: (tree) => {
+      prependToHead(tree, inlineScript(runnerScript, { [MARKER]: "" }));
+    },
+    waitUntil: {
+      type: "networkIdle",
+      idleTime: 500,
+      timeout: 30_000,
+    },
+    cleanup: (tree) => {
+      removeScripts(
+        tree,
+        (el) => isPrism(el) || MARKER in (el.properties ?? {}),
+      );
+    },
+  };
+}

@@ -12,10 +12,10 @@ import {
 const DONE_KEY = "twitter-prerender-done";
 const MARKER = "dataPrerenderTwitter";
 
-// widgets.jsはまず空の`twttr`を代入し、その後で`events`等のプロパティを
-// 埋めていく。setter時点でbindしようとしてもeventsがまだ無いので、
-// 同じオブジェクト参照を掴んだままevents.bindが生えるのを短間隔で待ち、
-// 揃い次第bindする。
+// widgets.js first assigns an empty `twttr` and then fills in properties
+// like `events` afterwards. events is not yet present at setter time, so
+// we hold on to the same object reference and poll at short intervals
+// until events.bind appears, then bind.
 const initScript = `
 (function () {
   Object.defineProperty(window, "twttr", {
@@ -76,16 +76,17 @@ export function twitterSpec({
         `window[Symbol.for(${JSON.stringify(DONE_KEY)})] === true`,
         timeout !== undefined ? { timeout } : {},
       ),
-    // 本物のwidgets.jsはblockquoteをplatform.twitter.com配下のクロスオリジン
-    // iframeに差し替える。contentDocumentは触れないので、puppeteerの
-    // ElementHandle.contentFrame()経由でフレームに入り、evaluateで中身を抜く。
+    // The real widgets.js replaces the blockquote with a cross-origin iframe
+    // under platform.twitter.com. contentDocument is off-limits, so we enter
+    // the frame via puppeteer's ElementHandle.contentFrame() and extract the
+    // contents with evaluate.
     finalize: async (page) => {
       const iframes = await page.$$("iframe");
       for (const iframe of iframes) {
         const frame = await iframe.contentFrame();
         if (!frame) continue;
         if (!matchSrc(frame.url())) continue;
-        // widgets.js は非表示の iframe も作る。表示中のものだけ対象にする。
+        // widgets.js also creates hidden iframes; only target visible ones.
         const isVisible = await page.evaluate(
           // @ts-expect-error runs in browser context
           (el) => getComputedStyle(el).display !== "none",
@@ -98,9 +99,9 @@ export function twitterSpec({
           { timeout: 15_000 },
         );
 
-        // iframe 内の全 CSSRules をテキストとして抽出する。
-        // React Native for Web はアトミック CSS を CSSOM 経由で注入するため
-        // <style> の innerHTML には含まれない。
+        // Extract all CSSRules inside the iframe as text. React Native for
+        // Web injects atomic CSS via the CSSOM, so it is not present in the
+        // innerHTML of any <style>.
         const allCss = await frame.evaluate(`
           Array.from(document.styleSheets).map(function (sheet) {
             try {
@@ -109,7 +110,7 @@ export function twitterSpec({
           }).join("\\n")
         `);
         const bodyInnerHtml = await frame.evaluate("document.body.innerHTML");
-        // body の computed style からレイアウト関連プロパティを取得
+        // Pull layout-related properties from the body's computed style.
         const bodyComputedStyle = await frame.evaluate(`
           (function () {
             const cs = getComputedStyle(document.body);
@@ -153,7 +154,7 @@ export function twitterSpec({
         (el) =>
           isTwitterScript(el) ||
           (el.tagName === "script" && MARKER in (el.properties ?? {})) ||
-          // widgets.js が残した非表示 iframe を除去
+          // Drop hidden iframes left behind by widgets.js.
           el.tagName === "iframe",
       );
     },

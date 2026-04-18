@@ -9,7 +9,7 @@ import { PRERENDER_TEST_OPTS } from "test-helpers";
 const HTML =
   "<!doctype html><html><head></head><body><p>hello</p></body></html>";
 
-test("when が true を返す spec のフックが prepare → waitUntil → finalize → cleanup の順に1回ずつ実行される", async () => {
+test("hooks of a spec whose when returns true run once each in order: prepare -> waitUntil -> finalize -> cleanup", async () => {
   const calls: string[] = [];
 
   const spec: PrerenderSpec = {
@@ -39,7 +39,7 @@ test("when が true を返す spec のフックが prepare → waitUntil → fin
   assert.deepEqual(calls, ["when", "prepare", "finalize", "cleanup"]);
 });
 
-test("when が false を返す spec はフックが一切実行されない", async () => {
+test("no hook runs when a spec's when returns false", async () => {
   const calls: string[] = [];
 
   const spec: PrerenderSpec = {

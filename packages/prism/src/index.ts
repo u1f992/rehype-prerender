@@ -26,24 +26,36 @@ const initScript = `
  * Create a PrerenderSpec for Prism. Handles any combination of plugins
  * (autoloader, file-highlight, etc.) with a single spec.
  *
- * @param matchSrc - Predicate applied to each `<script src="…">` value.
- *   Return `true` for Prism-related scripts so they can be detected and
- *   removed after pre-rendering.
+ * @param srcs - The full set of `<script src="…">` values identifying the
+ *   Prism loader and plugins in the manuscript. Matched by strict string
+ *   equality. The spec activates only when every entry is present in the
+ *   document, and each matching `<script>` is removed after pre-rendering.
  */
 export function prismSpec({
-  matchSrc,
+  srcs,
   timeout,
 }: {
-  matchSrc: (src: string) => boolean;
+  srcs: readonly string[];
   timeout?: number | undefined;
 }): PrerenderSpec {
+  const targetSrcs = new Set(srcs);
   const isPrismScript = (el: hast.Element) =>
     el.tagName === "script" &&
     typeof el.properties?.src === "string" &&
-    matchSrc(el.properties.src);
+    targetSrcs.has(el.properties.src);
 
   return {
-    when: (tree) => hasElement(tree, isPrismScript),
+    when: (tree) => {
+      if (targetSrcs.size === 0) return false;
+      for (const target of targetSrcs) {
+        const found = hasElement(
+          tree,
+          (el) => el.tagName === "script" && el.properties?.src === target,
+        );
+        if (!found) return false;
+      }
+      return true;
+    },
     prepare: (tree) => {
       prependToHead(tree, inlineScript(initScript, { [MARKER]: "" }));
     },

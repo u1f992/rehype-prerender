@@ -13,8 +13,9 @@
     "rehype-prerender": "0.0.0"
   },
   "devDependencies": {
-    "test-helpers": "*",
     "@types/hast": "^2.3.10",
-    "rehype": "^11.0.0"
+    "prismjs": "1.30.0",
+    "rehype": "^11.0.0",
+    "test-helpers": "*"
   }
 }

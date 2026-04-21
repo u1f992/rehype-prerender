@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
 import test from "node:test";
+import url from "node:url";
 
 import rehype from "rehype";
 
@@ -56,4 +57,50 @@ test("MathJax: formulas are converted to CHTML and <script> references are remov
     fixturesDir: FIXTURES_DIR,
     diffOutputPath: path.join(RESULTS_DIR, "mathjax-diff.png"),
   });
+});
+
+test("MathJax: locally bundled mathjax under fixtures/ is consumed via relative <script src>", async () => {
+  const htmlPath = path.join(FIXTURES_DIR, "mathjax.local.html");
+  const localMathjaxDir = path.join(FIXTURES_DIR, "mathjax");
+  const sourceMathjaxDir = path.dirname(
+    url.fileURLToPath(import.meta.resolve("mathjax/package.json")),
+  );
+  fs.cpSync(sourceMathjaxDir, localMathjaxDir, { recursive: true });
+  try {
+    const html = fs.readFileSync(htmlPath, "utf-8");
+    const localSpec = mathjaxSpec({
+      matchSrc: (src) => src.startsWith("mathjax/"),
+    });
+    const result = await rehype()
+      .use(prerender, {
+        specs: [localSpec],
+        ...PRERENDER_TEST_OPTS,
+      })
+      .process({ contents: html, path: htmlPath });
+    const output = String(result);
+
+    assert.ok(
+      output.includes("MJXc-") || output.includes("mjx-chtml"),
+      `Expected MathJax CHTML markup. Got: ${output.slice(0, 400)}...`,
+    );
+    assert.ok(
+      !/<script[^>]+src="[^"]*mathjax\/MathJax\.js/i.test(output),
+      "Local MathJax <script> reference is still present",
+    );
+    assert.ok(
+      !output.includes("Symbol.for"),
+      "Injected done-flag script is still present",
+    );
+
+    fs.mkdirSync(RESULTS_DIR, { recursive: true });
+    fs.writeFileSync(path.join(RESULTS_DIR, "mathjax.local.html"), output);
+
+    await assertVisualMatchRender(htmlPath, output, {
+      ...PRERENDER_TEST_OPTS,
+      fixturesDir: FIXTURES_DIR,
+      diffOutputPath: path.join(RESULTS_DIR, "mathjax.local-diff.png"),
+    });
+  } finally {
+    fs.rmSync(localMathjaxDir, { recursive: true, force: true });
+  }
 });

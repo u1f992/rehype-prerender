@@ -65,6 +65,33 @@ test("Prism: autoloader fetches languages and tokenizes, Prism references are re
   });
 });
 
+test("Prism: idleTime is forwarded to page.waitForNetworkIdle and an overly small value causes a timeout", async () => {
+  const htmlPath = path.join(FIXTURES_DIR, "autoloader.html");
+  const html = fs.readFileSync(htmlPath, "utf-8");
+
+  // idleTime greater than timeout forces waitForNetworkIdle to time out before
+  // any idle window can be observed. If idleTime were ignored (and defaulted
+  // to 500), the waiter would finish well inside the 1s timeout and no error
+  // would surface. The thrown TimeoutError therefore proves the value reached
+  // page.waitForNetworkIdle.
+  await assert.rejects(
+    () =>
+      rehype()
+        .use(prerender, {
+          specs: [
+            prismSpec({
+              srcs: [PRISM_CORE, PRISM_AUTOLOADER],
+              idleTime: 5_000,
+              timeout: 1_000,
+            }),
+          ],
+          ...PRERENDER_TEST_OPTS,
+        })
+        .process({ contents: html, path: htmlPath }),
+    /Timeout/i,
+  );
+});
+
 test("Prism: prerenderPrism wrapper produces the same baked output as the spec form", async () => {
   const htmlPath = path.join(FIXTURES_DIR, "autoloader.html");
   const html = fs.readFileSync(htmlPath, "utf-8");

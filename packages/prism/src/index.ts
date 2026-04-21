@@ -32,14 +32,29 @@ export type PrismSpecOptions = {
    * each matching `<script>` is removed after pre-rendering.
    */
   srcs: readonly string[];
+  /**
+   * How long the network must be idle (no more than two in-flight requests)
+   * before completion is declared, in milliseconds. Defaults to 500. Prism
+   * plugins have no universal done signal, so completion is inferred from
+   * network quiescence; raise this if highlighting under slow CDNs or many
+   * chained language dependencies, lower it to reduce build time when the
+   * page is known to be light.
+   */
+  idleTime?: number | undefined;
   timeout?: number | undefined;
 };
+
+const DEFAULT_IDLE_TIME_MS = 500;
 
 /**
  * Create a PrerenderSpec for Prism. Handles any combination of plugins
  * (autoloader, file-highlight, etc.) with a single spec.
  */
-export function prismSpec({ srcs, timeout }: PrismSpecOptions): PrerenderSpec {
+export function prismSpec({
+  srcs,
+  idleTime = DEFAULT_IDLE_TIME_MS,
+  timeout,
+}: PrismSpecOptions): PrerenderSpec {
   const targetSrcs = new Set(srcs);
   const isPrismScript = (el: hast.Element) =>
     el.tagName === "script" &&
@@ -63,7 +78,7 @@ export function prismSpec({ srcs, timeout }: PrismSpecOptions): PrerenderSpec {
     },
     waitUntil: (page) =>
       page.waitForNetworkIdle({
-        idleTime: 500,
+        idleTime,
         ...(timeout !== undefined && { timeout }),
       }),
     cleanup: (tree) => {
@@ -89,6 +104,12 @@ export type PrerenderPrismOptions = Omit<PrerenderOptions, "specs"> &
 export function prerenderPrism(options: PrerenderPrismOptions) {
   return prerender({
     ...options,
-    specs: [prismSpec({ srcs: options.srcs, timeout: options.timeout })],
+    specs: [
+      prismSpec({
+        srcs: options.srcs,
+        idleTime: options.idleTime,
+        timeout: options.timeout,
+      }),
+    ],
   });
 }

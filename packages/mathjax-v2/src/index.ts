@@ -4,7 +4,9 @@ import {
   hasElement,
   inlineScript,
   prependToHead,
+  prerender,
   removeElements,
+  type PrerenderOptions,
   type PrerenderSpec,
 } from "rehype-prerender";
 
@@ -27,21 +29,24 @@ const initScript = `
 })();
 `;
 
+export type MathJaxSpecOptions = {
+  /**
+   * The `<script src="…">` value identifying the MathJax loader. Matched by
+   * equality on the path portion only; `?config=…` query strings are ignored
+   * on both sides so the same spec works regardless of which MathJax config
+   * the manuscript loads.
+   */
+  src: string;
+  timeout?: number | undefined;
+};
+
 /**
  * Create a PrerenderSpec for MathJax v2.
- *
- * @param src - The `<script src="…">` value identifying the MathJax loader.
- *   Matched by equality on the path portion only; `?config=…` query strings
- *   are ignored on both sides so the same spec works regardless of which
- *   MathJax config the manuscript loads.
  */
 export function mathjaxSpec({
   src,
   timeout,
-}: {
-  src: string;
-  timeout?: number | undefined;
-}): PrerenderSpec {
+}: MathJaxSpecOptions): PrerenderSpec {
   const withoutQuery = (s: string) => {
     const i = s.indexOf("?");
     return i < 0 ? s : s.slice(0, i);
@@ -71,4 +76,20 @@ export function mathjaxSpec({
       );
     },
   };
+}
+
+export type PrerenderMathJaxOptions = Omit<PrerenderOptions, "specs"> &
+  MathJaxSpecOptions;
+
+/**
+ * Rehype plugin: pre-render MathJax v2 formulas. Thin wrapper around
+ * `prerender` with a single `mathjaxSpec`. Use this when MathJax is the only
+ * library to bake; compose `prerender` directly when combining multiple
+ * libraries in one pass.
+ */
+export function prerenderMathJax(options: PrerenderMathJaxOptions) {
+  return prerender({
+    ...options,
+    specs: [mathjaxSpec({ src: options.src, timeout: options.timeout })],
+  });
 }

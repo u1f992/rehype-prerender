@@ -13,7 +13,7 @@ import {
   testDirs,
 } from "test-helpers";
 
-import { mathjaxSpec } from "../src/index.ts";
+import { mathjaxSpec, prerenderMathJax } from "../src/index.ts";
 
 const [FIXTURES_DIR, RESULTS_DIR] = testDirs(import.meta.url);
 
@@ -57,6 +57,42 @@ test("MathJax: formulas are converted to CHTML and <script> references are remov
     ...PRERENDER_TEST_OPTS,
     fixturesDir: FIXTURES_DIR,
     diffOutputPath: path.join(RESULTS_DIR, "mathjax-diff.png"),
+  });
+});
+
+test("MathJax: prerenderMathJax wrapper produces the same baked output as the spec form", async () => {
+  const htmlPath = path.join(FIXTURES_DIR, "mathjax.html");
+  const html = fs.readFileSync(htmlPath, "utf-8");
+  const result = await rehype()
+    .use(prerenderMathJax, {
+      src: MATHJAX_CDN_SRC,
+      ...PRERENDER_TEST_OPTS,
+    })
+    .process({ contents: html, path: htmlPath });
+  const output = String(result);
+
+  assert.ok(
+    output.includes("MJXc-") || output.includes("mjx-chtml"),
+    `Expected MathJax CHTML markup. Got: ${output.slice(0, 400)}...`,
+  );
+  assert.ok(
+    !/<script[^>]+src="[^"]*cdnjs\.cloudflare\.com\/ajax\/libs\/mathjax/i.test(
+      output,
+    ),
+    "MathJax <script> reference that would re-trigger execution is still present",
+  );
+  assert.ok(
+    !output.includes("Symbol.for"),
+    "Injected done-flag script is still present",
+  );
+
+  fs.mkdirSync(RESULTS_DIR, { recursive: true });
+  fs.writeFileSync(path.join(RESULTS_DIR, "mathjax.wrapper.html"), output);
+
+  await assertVisualMatchRender(htmlPath, output, {
+    ...PRERENDER_TEST_OPTS,
+    fixturesDir: FIXTURES_DIR,
+    diffOutputPath: path.join(RESULTS_DIR, "mathjax.wrapper-diff.png"),
   });
 });
 

@@ -47,7 +47,7 @@ export type PrerenderSpec = {
   cleanup?: (tree: hast.Root) => void | Promise<void>;
 };
 
-type PrerenderOptions = {
+export type PrerenderOptions = {
   specs: readonly PrerenderSpec[];
   /**
    * Directory to install / find Chrome under. Required.

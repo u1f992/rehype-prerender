@@ -4,7 +4,9 @@ import {
   hasElement,
   inlineScript,
   prependToHead,
+  prerender,
   removeElements,
+  type PrerenderOptions,
   type PrerenderSpec,
 } from "rehype-prerender";
 
@@ -22,22 +24,22 @@ const initScript = `
 })();
 `;
 
+export type PrismSpecOptions = {
+  /**
+   * The full set of `<script src="…">` values identifying the Prism loader
+   * and plugins in the manuscript. Matched by strict string equality. The
+   * spec activates only when every entry is present in the document, and
+   * each matching `<script>` is removed after pre-rendering.
+   */
+  srcs: readonly string[];
+  timeout?: number | undefined;
+};
+
 /**
  * Create a PrerenderSpec for Prism. Handles any combination of plugins
  * (autoloader, file-highlight, etc.) with a single spec.
- *
- * @param srcs - The full set of `<script src="…">` values identifying the
- *   Prism loader and plugins in the manuscript. Matched by strict string
- *   equality. The spec activates only when every entry is present in the
- *   document, and each matching `<script>` is removed after pre-rendering.
  */
-export function prismSpec({
-  srcs,
-  timeout,
-}: {
-  srcs: readonly string[];
-  timeout?: number | undefined;
-}): PrerenderSpec {
+export function prismSpec({ srcs, timeout }: PrismSpecOptions): PrerenderSpec {
   const targetSrcs = new Set(srcs);
   const isPrismScript = (el: hast.Element) =>
     el.tagName === "script" &&
@@ -73,4 +75,20 @@ export function prismSpec({
       );
     },
   };
+}
+
+export type PrerenderPrismOptions = Omit<PrerenderOptions, "specs"> &
+  PrismSpecOptions;
+
+/**
+ * Rehype plugin: pre-render Prism syntax highlighting. Thin wrapper around
+ * `prerender` with a single `prismSpec`. Use this when Prism is the only
+ * library to bake; compose `prerender` directly when combining multiple
+ * libraries in one pass.
+ */
+export function prerenderPrism(options: PrerenderPrismOptions) {
+  return prerender({
+    ...options,
+    specs: [prismSpec({ srcs: options.srcs, timeout: options.timeout })],
+  });
 }

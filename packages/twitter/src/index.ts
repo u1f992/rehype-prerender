@@ -5,7 +5,9 @@ import {
   hasMatch,
   inlineScript,
   prependToHead,
+  prerender,
   removeElements,
+  type PrerenderOptions,
   type PrerenderSpec,
 } from "rehype-prerender";
 
@@ -61,28 +63,32 @@ const initScript = `
 })();
 `;
 
+export type TwitterSpecOptions = {
+  /**
+   * The exact `<script src="…">` value identifying the Twitter widgets
+   * loader. Used only to detect whether the spec applies. Defaults to
+   * `DEFAULT_TWITTER_WIDGETS_SRC`.
+   */
+  src?: string | undefined;
+  /**
+   * Predicate applied to scripts and iframe URLs encountered at cleanup /
+   * finalize time. widgets.js injects additional webpack chunks and iframes
+   * at runtime with URLs that are not known ahead of time; everything this
+   * predicate matches is treated as part of the Twitter runtime and removed
+   * or extracted. Defaults to `matchesTwitterHost`.
+   */
+  matchInjectedSrc?: ((src: string) => boolean) | undefined;
+  timeout?: number | undefined;
+};
+
 /**
  * Create a PrerenderSpec for Twitter embedded tweets.
- *
- * @param src - The exact `<script src="…">` value identifying the Twitter
- *   widgets loader. Used only to detect whether the spec applies.
- *   Defaults to `DEFAULT_TWITTER_WIDGETS_SRC`.
- * @param matchInjectedSrc - Predicate applied to scripts and iframe URLs
- *   encountered at cleanup / finalize time. widgets.js injects additional
- *   webpack chunks and iframes at runtime with URLs that are not known
- *   ahead of time; everything this predicate matches is treated as part
- *   of the Twitter runtime and removed or extracted. Defaults to
- *   `matchesTwitterHost`.
  */
 export function twitterSpec({
   src = DEFAULT_TWITTER_WIDGETS_SRC,
   matchInjectedSrc = matchesTwitterHost,
   timeout,
-}: {
-  src?: string;
-  matchInjectedSrc?: (src: string) => boolean;
-  timeout?: number | undefined;
-} = {}): PrerenderSpec {
+}: TwitterSpecOptions = {}): PrerenderSpec {
   const isLoaderScript = (el: hast.Element) =>
     el.tagName === "script" && el.properties?.src === src;
 
@@ -187,4 +193,26 @@ export function twitterSpec({
       );
     },
   };
+}
+
+export type PrerenderTwitterOptions = Omit<PrerenderOptions, "specs"> &
+  TwitterSpecOptions;
+
+/**
+ * Rehype plugin: pre-render Twitter embedded tweets. Thin wrapper around
+ * `prerender` with a single `twitterSpec`. Use this when Twitter is the only
+ * library to bake; compose `prerender` directly when combining multiple
+ * libraries in one pass.
+ */
+export function prerenderTwitter(options: PrerenderTwitterOptions) {
+  return prerender({
+    ...options,
+    specs: [
+      twitterSpec({
+        src: options.src,
+        matchInjectedSrc: options.matchInjectedSrc,
+        timeout: options.timeout,
+      }),
+    ],
+  });
 }

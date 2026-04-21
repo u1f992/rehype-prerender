@@ -12,7 +12,7 @@ import {
   testDirs,
 } from "test-helpers";
 
-import { twitterSpec } from "../src/index.ts";
+import { prerenderTwitter, twitterSpec } from "../src/index.ts";
 
 const [FIXTURES_DIR, RESULTS_DIR] = testDirs(import.meta.url);
 
@@ -54,5 +54,43 @@ test("Twitter: bakes jack/status/20 via the real widgets.js and removes script r
     ...PRERENDER_TEST_OPTS,
     fixturesDir: FIXTURES_DIR,
     diffOutputPath: path.join(RESULTS_DIR, "twitter-diff.png"),
+  });
+});
+
+test("Twitter: prerenderTwitter wrapper produces the same baked output as the spec form", async () => {
+  const htmlPath = path.join(FIXTURES_DIR, "twitter.html");
+  const html = fs.readFileSync(htmlPath, "utf-8");
+
+  const result = await rehype()
+    .use(prerenderTwitter, {
+      ...PRERENDER_TEST_OPTS,
+    })
+    .process({ contents: html, path: htmlPath });
+  const output = String(result);
+
+  assert.ok(
+    output.includes('class="tweet-extracted"'),
+    `Could not find the div expanded by finalize: ${output.slice(0, 400)}`,
+  );
+  assert.ok(
+    output.includes("just setting up my twttr"),
+    "Tweet body was not hoisted into the outer DOM",
+  );
+  assert.ok(
+    !/<blockquote[^>]*class="[^"]*twitter-tweet/.test(output),
+    "Original blockquote is still present",
+  );
+  assert.ok(
+    !/<script[^>]+src="[^"]*platform\.twitter\.com/i.test(output),
+    "A script from platform.twitter.com is still present",
+  );
+
+  fs.mkdirSync(RESULTS_DIR, { recursive: true });
+  fs.writeFileSync(path.join(RESULTS_DIR, "twitter.wrapper.html"), output);
+
+  await assertVisualMatchRender(htmlPath, output, {
+    ...PRERENDER_TEST_OPTS,
+    fixturesDir: FIXTURES_DIR,
+    diffOutputPath: path.join(RESULTS_DIR, "twitter.wrapper-diff.png"),
   });
 });

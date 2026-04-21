@@ -13,7 +13,7 @@ import {
   testDirs,
 } from "test-helpers";
 
-import { prismSpec } from "../src/index.ts";
+import { prerenderPrism, prismSpec } from "../src/index.ts";
 
 const [FIXTURES_DIR, RESULTS_DIR] = testDirs(import.meta.url);
 
@@ -62,6 +62,47 @@ test("Prism: autoloader fetches languages and tokenizes, Prism references are re
     ...PRERENDER_TEST_OPTS,
     fixturesDir: FIXTURES_DIR,
     diffOutputPath: path.join(RESULTS_DIR, "autoloader-diff.png"),
+  });
+});
+
+test("Prism: prerenderPrism wrapper produces the same baked output as the spec form", async () => {
+  const htmlPath = path.join(FIXTURES_DIR, "autoloader.html");
+  const html = fs.readFileSync(htmlPath, "utf-8");
+
+  const result = await rehype()
+    .use(prerenderPrism, {
+      srcs: [PRISM_CORE, PRISM_AUTOLOADER],
+      ...PRERENDER_TEST_OPTS,
+    })
+    .process({ contents: html, path: htmlPath });
+  const output = String(result);
+
+  assert.ok(
+    /<span[^>]*class="token/.test(output),
+    `No Prism tokens found: ${output.slice(0, 400)}`,
+  );
+  assert.ok(
+    output.includes("print_endline") || output.includes("print"),
+    "Original code text has been lost",
+  );
+  assert.ok(
+    !/<script[^>]+src="[^"]*cdnjs\.cloudflare\.com\/ajax\/libs\/prism/i.test(
+      output,
+    ),
+    "Prism script reference is still present",
+  );
+  assert.ok(
+    !output.includes("Prism.highlightAll"),
+    "Injected runner script is still present",
+  );
+
+  fs.mkdirSync(RESULTS_DIR, { recursive: true });
+  fs.writeFileSync(path.join(RESULTS_DIR, "autoloader.wrapper.html"), output);
+
+  await assertVisualMatchRender(htmlPath, output, {
+    ...PRERENDER_TEST_OPTS,
+    fixturesDir: FIXTURES_DIR,
+    diffOutputPath: path.join(RESULTS_DIR, "autoloader.wrapper-diff.png"),
   });
 });
 

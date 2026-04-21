@@ -26,25 +26,28 @@ export type PrerenderSpec = {
    * Mutate the hast tree before serialization. Typical use: inject a
    * done-flag script into <head>.
    */
-  prepare?: (tree: hast.Root) => void | Promise<void>;
+  prepare?: (tree: hast.Root) => unknown | Promise<unknown>;
   /**
    * Wait until the browser has finished running this library. Receives the
    * live Page; typical bodies call `page.waitForFunction` against an
    * injected done flag, or `page.waitForNetworkIdle` for libraries without
    * a deterministic completion signal. The resolved value is ignored.
+   *
+   * Omit when the library's work completes synchronously during
+   * `page.setContent`'s "load" wait, so no further waiting is needed.
    */
-  waitUntil: (page: Page) => Promise<unknown>;
+  waitUntil?: (page: Page) => unknown | Promise<unknown>;
   /**
    * Runs against the live Page after waitUntil, before content extraction.
    * Typical use: unwrap iframes whose same-origin contents must be inlined
    * before serialization strips them.
    */
-  finalize?: (page: Page) => void | Promise<void>;
+  finalize?: (page: Page) => unknown | Promise<unknown>;
   /**
    * Mutate the re-parsed hast tree after extraction. Typical use: remove the
    * injected done-flag script and the library's own <script> references.
    */
-  cleanup?: (tree: hast.Root) => void | Promise<void>;
+  cleanup?: (tree: hast.Root) => unknown | Promise<unknown>;
 };
 
 export type PrerenderOptions = {
@@ -235,7 +238,7 @@ export function prerender(options: PrerenderOptions) {
       });
 
       for (const s of applicable) {
-        await s.waitUntil(page);
+        await s.waitUntil?.(page);
       }
 
       for (const s of applicable) {

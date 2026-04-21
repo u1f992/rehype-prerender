@@ -16,9 +16,7 @@ import { twitterSpec } from "../src/index.ts";
 
 const [FIXTURES_DIR, RESULTS_DIR] = testDirs(import.meta.url);
 
-const spec = twitterSpec({
-  matchSrc: (src) => src.includes("platform.twitter.com/"),
-});
+const spec = twitterSpec();
 
 test("Twitter: bakes jack/status/20 via the real widgets.js and removes script references", async () => {
   const htmlPath = path.join(FIXTURES_DIR, "twitter.html");
@@ -45,8 +43,8 @@ test("Twitter: bakes jack/status/20 via the real widgets.js and removes script r
     "Original blockquote is still present",
   );
   assert.ok(
-    !/<script[^>]+src="[^"]*platform\.twitter\.com\/widgets\.js/i.test(output),
-    "widgets.js reference is still present",
+    !/<script[^>]+src="[^"]*platform\.twitter\.com/i.test(output),
+    "A script from platform.twitter.com is still present",
   );
 
   fs.mkdirSync(RESULTS_DIR, { recursive: true });

@@ -12,6 +12,22 @@ import {
 const DONE_KEY = "twitter-prerender-done";
 const MARKER = "dataPrerenderTwitter";
 
+export const DEFAULT_TWITTER_WIDGETS_SRC =
+  "https://platform.twitter.com/widgets.js";
+
+/**
+ * Default predicate for `matchInjectedSrc`. Matches any URL whose hostname
+ * is `platform.twitter.com`, i.e. the webpack chunks and iframes that
+ * widgets.js injects at runtime.
+ */
+export function matchesTwitterHost(src: string): boolean {
+  try {
+    return new URL(src).hostname === "platform.twitter.com";
+  } catch {
+    return false;
+  }
+}
+
 // widgets.js first assigns an empty `twttr` and then fills in properties
 // like `events` afterwards. events is not yet present at setter time, so
 // we hold on to the same object reference and poll at short intervals
@@ -48,26 +64,37 @@ const initScript = `
 /**
  * Create a PrerenderSpec for Twitter embedded tweets.
  *
- * @param matchSrc - Predicate applied to each `<script src="…">` value
- *   and iframe URL. Return `true` for Twitter-related URLs so they can
- *   be detected and removed after pre-rendering.
+ * @param src - The exact `<script src="…">` value identifying the Twitter
+ *   widgets loader. Used only to detect whether the spec applies.
+ *   Defaults to `DEFAULT_TWITTER_WIDGETS_SRC`.
+ * @param matchInjectedSrc - Predicate applied to scripts and iframe URLs
+ *   encountered at cleanup / finalize time. widgets.js injects additional
+ *   webpack chunks and iframes at runtime with URLs that are not known
+ *   ahead of time; everything this predicate matches is treated as part
+ *   of the Twitter runtime and removed or extracted. Defaults to
+ *   `matchesTwitterHost`.
  */
 export function twitterSpec({
-  matchSrc,
+  src = DEFAULT_TWITTER_WIDGETS_SRC,
+  matchInjectedSrc = matchesTwitterHost,
   timeout,
 }: {
-  matchSrc: (src: string) => boolean;
+  src?: string;
+  matchInjectedSrc?: (src: string) => boolean;
   timeout?: number | undefined;
-}): PrerenderSpec {
-  const isTwitterScript = (el: hast.Element) =>
+} = {}): PrerenderSpec {
+  const isLoaderScript = (el: hast.Element) =>
+    el.tagName === "script" && el.properties?.src === src;
+
+  const isInjectedScript = (el: hast.Element) =>
     el.tagName === "script" &&
     typeof el.properties?.src === "string" &&
-    matchSrc(el.properties.src);
+    matchInjectedSrc(el.properties.src);
 
   return {
     when: (tree) =>
       hasMatch(tree, "blockquote.twitter-tweet") &&
-      hasElement(tree, isTwitterScript),
+      hasElement(tree, isLoaderScript),
     prepare: (tree) => {
       prependToHead(tree, inlineScript(initScript, { [MARKER]: "" }));
     },
@@ -85,7 +112,7 @@ export function twitterSpec({
       for (const iframe of iframes) {
         const frame = await iframe.contentFrame();
         if (!frame) continue;
-        if (!matchSrc(frame.url())) continue;
+        if (!matchInjectedSrc(frame.url())) continue;
         // widgets.js also creates hidden iframes; only target visible ones.
         const isVisible = await page.evaluate(
           // @ts-expect-error runs in browser context
@@ -152,7 +179,8 @@ export function twitterSpec({
       removeElements(
         tree,
         (el) =>
-          isTwitterScript(el) ||
+          isLoaderScript(el) ||
+          isInjectedScript(el) ||
           (el.tagName === "script" && MARKER in (el.properties ?? {})) ||
           // Drop hidden iframes left behind by widgets.js.
           el.tagName === "iframe",

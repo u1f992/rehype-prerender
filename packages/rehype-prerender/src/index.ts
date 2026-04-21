@@ -64,8 +64,8 @@ export type PrerenderOptions = {
   launchArgs?: readonly string[];
   /**
    * URL origin used as the document base during pre-render. Requests to this
-   * origin are routed to resolveResource; other origins pass through. Must
-   * end with "/".
+   * origin are routed to resolveResource; other origins pass through. A
+   * trailing "/" is appended automatically if absent.
    */
   baseUrl?: string;
   /**
@@ -154,10 +154,8 @@ function patchDoctypeName(root: hast.Root) {
  */
 export function prerender(options: PrerenderOptions) {
   const specs = options.specs;
-  const baseUrl = options.baseUrl ?? DEFAULT_BASE_URL;
-  if (!baseUrl.endsWith("/")) {
-    throw new Error(`baseUrl must end with "/": ${baseUrl}`);
-  }
+  const rawBaseUrl = options.baseUrl ?? DEFAULT_BASE_URL;
+  const baseUrl = rawBaseUrl.endsWith("/") ? rawBaseUrl : rawBaseUrl + "/";
   const resolveResource = options.resolveResource ?? defaultResolveResource;
   const navigationTimeout = options.navigationTimeout ?? DEFAULT_TIMEOUT_MS;
   const browserCacheDir = options.browserCacheDir;

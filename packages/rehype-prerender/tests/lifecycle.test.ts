@@ -39,6 +39,21 @@ test("hooks of a spec whose when returns true run once each in order: prepare ->
   assert.deepEqual(calls, ["when", "prepare", "finalize", "cleanup"]);
 });
 
+test("baseUrl without a trailing slash is accepted and a slash is appended", async () => {
+  const spec: PrerenderSpec = {
+    when: () => true,
+    waitUntil: (page) => page.waitForFunction("true", { timeout: 5_000 }),
+  };
+
+  await rehype()
+    .use(prerender, {
+      specs: [spec],
+      baseUrl: "https://prerender.invalid",
+      ...PRERENDER_TEST_OPTS,
+    })
+    .process(HTML);
+});
+
 test("no hook runs when a spec's when returns false", async () => {
   const calls: string[] = [];
 

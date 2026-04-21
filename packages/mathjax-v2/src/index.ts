@@ -30,21 +30,27 @@ const initScript = `
 /**
  * Create a PrerenderSpec for MathJax v2.
  *
- * @param matchSrc - Predicate applied to each `<script src="…">` value.
- *   Return `true` for MathJax-related scripts so they can be detected and
- *   removed after pre-rendering.
+ * @param src - The `<script src="…">` value identifying the MathJax loader.
+ *   Matched by equality on the path portion only; `?config=…` query strings
+ *   are ignored on both sides so the same spec works regardless of which
+ *   MathJax config the manuscript loads.
  */
 export function mathjaxSpec({
-  matchSrc,
+  src,
   timeout,
 }: {
-  matchSrc: (src: string) => boolean;
+  src: string;
   timeout?: number | undefined;
 }): PrerenderSpec {
+  const withoutQuery = (s: string) => {
+    const i = s.indexOf("?");
+    return i < 0 ? s : s.slice(0, i);
+  };
+  const targetSrc = withoutQuery(src);
   const isMathJaxScript = (el: hast.Element) =>
     el.tagName === "script" &&
     typeof el.properties?.src === "string" &&
-    matchSrc(el.properties.src);
+    withoutQuery(el.properties.src) === targetSrc;
 
   return {
     when: (tree) => hasElement(tree, isMathJaxScript),

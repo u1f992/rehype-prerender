@@ -17,8 +17,9 @@ import { mathjaxSpec } from "../src/index.ts";
 
 const [FIXTURES_DIR, RESULTS_DIR] = testDirs(import.meta.url);
 
-const MATHJAX_CDN = "cdnjs.cloudflare.com/ajax/libs/mathjax";
-const spec = mathjaxSpec({ matchSrc: (src) => src.includes(MATHJAX_CDN) });
+const MATHJAX_CDN_SRC =
+  "https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.9/MathJax.js";
+const spec = mathjaxSpec({ src: MATHJAX_CDN_SRC });
 
 test("MathJax: formulas are converted to CHTML and <script> references are removed", async () => {
   const htmlPath = path.join(FIXTURES_DIR, "mathjax.html");
@@ -69,7 +70,7 @@ test("MathJax: locally bundled mathjax under fixtures/ is consumed via relative 
   try {
     const html = fs.readFileSync(htmlPath, "utf-8");
     const localSpec = mathjaxSpec({
-      matchSrc: (src) => src.startsWith("mathjax/"),
+      src: "mathjax/MathJax.js",
     });
     const result = await rehype()
       .use(prerender, {

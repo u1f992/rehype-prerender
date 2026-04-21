@@ -2,11 +2,7 @@
   "type": "module",
   "private": true,
   "workspaces": [
-    "packages/rehype-prerender",
-    "packages/mathjax-v2",
-    "packages/prism",
-    "packages/twitter",
-    "packages/test-helpers"
+    "packages/*"
   ],
   "//": {
     "scripts.lint": [

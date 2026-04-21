@@ -1,0 +1,9 @@
+{
+  "files": [],
+  "references": [
+    { "path": "./packages/rehype-prerender" },
+    { "path": "./packages/mathjax-v2" },
+    { "path": "./packages/prism" },
+    { "path": "./packages/twitter" }
+  ]
+}

@@ -13,7 +13,7 @@ import {
   testDirs,
 } from "test-helpers";
 
-import { mathjaxSpec, prerenderMathJax } from "../src/index.ts";
+import { mathjaxSpec, prerenderMathJax } from "#self";
 
 const [FIXTURES_DIR, RESULTS_DIR] = testDirs(import.meta.url);
 

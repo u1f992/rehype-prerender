@@ -12,7 +12,7 @@ import {
   testDirs,
 } from "test-helpers";
 
-import { prerenderTwitter, twitterSpec } from "../src/index.ts";
+import { prerenderTwitter, twitterSpec } from "#self";
 
 const [FIXTURES_DIR, RESULTS_DIR] = testDirs(import.meta.url);
 

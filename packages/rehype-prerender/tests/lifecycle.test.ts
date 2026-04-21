@@ -3,7 +3,7 @@ import test from "node:test";
 
 import rehype from "rehype";
 
-import { prerender, type PrerenderSpec } from "../src/index.ts";
+import { prerender, type PrerenderSpec } from "#self";
 import { PRERENDER_TEST_OPTS } from "test-helpers";
 
 const HTML =

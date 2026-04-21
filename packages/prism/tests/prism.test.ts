@@ -13,7 +13,7 @@ import {
   testDirs,
 } from "test-helpers";
 
-import { prerenderPrism, prismSpec } from "../src/index.ts";
+import { prerenderPrism, prismSpec } from "#self";
 
 const [FIXTURES_DIR, RESULTS_DIR] = testDirs(import.meta.url);
 

@@ -3,6 +3,11 @@
   "version": "0.0.0",
   "type": "module",
   "license": "GPL-3.0-only",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/u1f992/rehype-prerender.git",
+    "directory": "packages/prism"
+  },
   "main": "./dist/index.js",
   "scripts": {
     "build": "tsc && tsc --project tests/tsconfig.json",

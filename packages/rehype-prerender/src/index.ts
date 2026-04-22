@@ -243,6 +243,39 @@ function createRequestHandler({
   };
 }
 
+/**
+ * Build the resolve callback for `createRequestHandler`. Returns the
+ * manuscript HTML for the entry URL, otherwise forwards to `resolveResource`
+ * and reads the resulting file from disk.
+ */
+function createResolveContent({
+  entryFilename,
+  html,
+  resolveResource,
+  file,
+}: {
+  entryFilename: string;
+  html: string;
+  resolveResource: (pathname: string, file: VFile) => string | null;
+  file: VFile;
+}) {
+  return (
+    pathname: string,
+  ): { contentType: string; body: string | Buffer } | null => {
+    if (pathname === "/" + entryFilename) {
+      return { contentType: "text/html; charset=utf-8", body: html };
+    }
+    const fsPath = resolveResource(pathname, file);
+    if (!fsPath || !fs.existsSync(fsPath) || !fs.statSync(fsPath).isFile()) {
+      return null;
+    }
+    return {
+      contentType: mime.getType(fsPath) ?? "text/plain; charset=utf-8",
+      body: fs.readFileSync(fsPath),
+    };
+  };
+}
+
 function patchDoctypeName(root: hast.Root) {
   root.children
     .filter((child) => child.type === "doctype" && !("name" in child))
@@ -392,23 +425,12 @@ export function prerender(options: PrerenderOptions) {
         "request",
         createRequestHandler({
           baseUrl,
-          resolve: (pathname) => {
-            if (pathname === "/" + ENTRY_FILENAME) {
-              return { contentType: "text/html; charset=utf-8", body: html };
-            }
-            const fsPath = resolveResource(pathname, file);
-            if (
-              !fsPath ||
-              !fs.existsSync(fsPath) ||
-              !fs.statSync(fsPath).isFile()
-            ) {
-              return null;
-            }
-            return {
-              contentType: mime.getType(fsPath) ?? "text/plain; charset=utf-8",
-              body: fs.readFileSync(fsPath),
-            };
-          },
+          resolve: createResolveContent({
+            entryFilename: ENTRY_FILENAME,
+            html,
+            resolveResource,
+            file,
+          }),
         }),
       );
 

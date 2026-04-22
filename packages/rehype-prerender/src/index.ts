@@ -216,7 +216,7 @@ function defaultResolveResource(pathname: string, file: VFile): string | null {
 /**
  * Build the puppeteer request interceptor used during pre-render. Serves the
  * entry URL as the manuscript HTML itself, maps other requests under
- * `baseUrl` through `resolve` to the filesystem, and lets external origins
+ * `baseUrl` through `resolve` to a response body, and lets external origins
  * pass through.
  */
 function createRequestHandler({
@@ -228,7 +228,7 @@ function createRequestHandler({
   entryUrl: string;
   html: string;
   baseUrl: string;
-  resolve: (pathname: string) => string | null;
+  resolve: (pathname: string) => { contentType: string; body: Buffer } | null;
 }) {
   return (req: HTTPRequest) => {
     const url = req.url();
@@ -243,16 +243,9 @@ function createRequestHandler({
       return;
     }
     if (url.startsWith(baseUrl)) {
-      const u = new URL(url);
-      const fsPath = resolve(u.pathname);
-      if (fsPath && fs.existsSync(fsPath) && fs.statSync(fsPath).isFile()) {
-        req
-          .respond({
-            status: 200,
-            contentType: mime.getType(fsPath) ?? "text/plain; charset=utf-8",
-            body: fs.readFileSync(fsPath),
-          })
-          .catch(() => {});
+      const asset = resolve(new URL(url).pathname);
+      if (asset) {
+        req.respond({ status: 200, ...asset }).catch(() => {});
         return;
       }
       req.respond({ status: 404, body: "" }).catch(() => {});
@@ -414,7 +407,20 @@ export function prerender(options: PrerenderOptions) {
           entryUrl,
           html,
           baseUrl,
-          resolve: (pathname) => resolveResource(pathname, file),
+          resolve: (pathname) => {
+            const fsPath = resolveResource(pathname, file);
+            if (
+              !fsPath ||
+              !fs.existsSync(fsPath) ||
+              !fs.statSync(fsPath).isFile()
+            ) {
+              return null;
+            }
+            return {
+              contentType: mime.getType(fsPath) ?? "text/plain; charset=utf-8",
+              body: fs.readFileSync(fsPath),
+            };
+          },
         }),
       );
 

@@ -215,16 +215,19 @@ function defaultResolveResource(pathname: string, file: VFile): string | null {
 
 /**
  * Build the puppeteer request interceptor used during pre-render. Serves the
- * entry URL as an empty shell, maps other requests under `baseUrl` through
- * `resolveResource` to the filesystem, and lets external origins pass through.
+ * entry URL as the manuscript HTML itself, maps other requests under
+ * `baseUrl` through `resolveResource` to the filesystem, and lets external
+ * origins pass through.
  */
 function createRequestHandler({
   entryUrl,
+  html,
   baseUrl,
   resolveResource,
   file,
 }: {
   entryUrl: string;
+  html: string;
   baseUrl: string;
   resolveResource: (pathname: string, file: VFile) => string | null;
   file: VFile;
@@ -236,7 +239,7 @@ function createRequestHandler({
         .respond({
           status: 200,
           contentType: "text/html; charset=utf-8",
-          body: "<!doctype html><html><head></head><body></body></html>",
+          body: html,
         })
         .catch(() => {});
       return;
@@ -409,14 +412,16 @@ export function prerender(options: PrerenderOptions) {
       const entryUrl = baseUrl + "__prerender_entry__.html";
       page.on(
         "request",
-        createRequestHandler({ entryUrl, baseUrl, resolveResource, file }),
+        createRequestHandler({
+          entryUrl,
+          html,
+          baseUrl,
+          resolveResource,
+          file,
+        }),
       );
 
       await page.goto(entryUrl, {
-        waitUntil: "domcontentloaded",
-        timeout: navigationTimeout,
-      });
-      await page.setContent(html, {
         waitUntil: "load",
         timeout: navigationTimeout,
       });

@@ -140,3 +140,8 @@ vite.config.ts.timestamp-*
 
 # Test results
 **/tests/results/
+
+# Test-time local copies created and torn down by the "locally bundled"
+# tests; a killed run can leave them behind.
+packages/prism/tests/fixtures/prism/
+packages/mathjax-v2/tests/fixtures/mathjax/

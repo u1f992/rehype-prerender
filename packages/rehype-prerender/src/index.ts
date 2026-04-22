@@ -78,11 +78,90 @@ export type PrerenderOptions = {
    */
   resolveResource?: (pathname: string, file: VFile) => string | null;
   navigationTimeout?: number;
+  /**
+   * After every spec's `waitUntil` resolves, the core re-asserts quiescence
+   * by alternating (a) a wait for all tracked short-delay setTimeouts to
+   * drain and (b) a `page.waitForNetworkIdle`. `networkIdleDuration` is the
+   * duration (in ms) the network must remain continuously idle before that
+   * leg returns — forwarded as `idleTime` to puppeteer. Defaults to 0,
+   * i.e. "idle right now is enough". Raise it to add a settle buffer when
+   * legacy libraries fetch on microtask boundaries that briefly register as
+   * idle; leave at 0 for libraries whose only async work is non-network
+   * setTimeouts, since the pending-timer gate already covers those and any
+   * positive value becomes pure wasted time.
+   */
+  networkIdleDuration?: number;
+  /**
+   * Upper bound on the number of (pending-tasks-drained → network-idle)
+   * alternation passes before the core quiescence gate gives up. Defaults
+   * to 20. Each pass absorbs one level of "the last callback scheduled
+   * more work" cascade, so the cap only bites on pathological pages
+   * (autoloader chain of 20+ hops, or an infinite setTimeout loop).
+   */
+  maxQuiescenceIterations?: number;
+  /**
+   * Per-step timeout for the core quiescence gate's `waitForFunction` and
+   * `waitForNetworkIdle` calls. Unset by default (puppeteer defaults
+   * apply). Separate from `navigationTimeout` (page load) and from
+   * per-spec `waitUntil` timeouts (done-flag polling).
+   */
+  quiescenceTimeout?: number;
 };
 
 const DEFAULT_BASE_URL = "https://prerender.invalid/";
 const DEFAULT_TIMEOUT_MS = 30_000;
+const DEFAULT_NETWORK_IDLE_DURATION_MS = 0;
+const DEFAULT_MAX_QUIESCENCE_ITERATIONS = 20;
 export const DEFAULT_CHROME_BUILD_ID = "146.0.7680.153";
+
+const PENDING_KEY = "__rehypePrerenderPendingTasks";
+const TRACKER_MARKER = "dataRehypePrerender";
+
+// Wraps window.setTimeout / clearTimeout so that short-delay timers (the
+// dangerous ones that create macrotask gaps bypassing network-idle detection,
+// e.g. autoloader's setTimeout(callback, 0)) are tracked in a counter exposed
+// as window[PENDING_KEY]. Long-delay timers (backstop/error timeouts) pass
+// through unmodified so they do not block completion. The counter is
+// decremented in a finally block after the callback returns, so the counter
+// remains non-zero while the callback is executing and its synchronous
+// descendants run — the gate only opens once that entire synchronous cascade
+// has finished.
+const TRACKER_SCRIPT = `
+(function () {
+  var count = 0;
+  var pending = new Map();
+  var origSet = window.setTimeout;
+  var origClear = window.clearTimeout;
+  var THRESHOLD_MS = 50;
+  window.setTimeout = function (cb, delay) {
+    if (typeof delay !== "number" || delay > THRESHOLD_MS) {
+      return origSet.apply(window, arguments);
+    }
+    var extras = [];
+    for (var i = 2; i < arguments.length; i++) extras.push(arguments[i]);
+    var id;
+    var wrapped = function () {
+      try {
+        return cb.apply(window, extras);
+      } finally {
+        if (pending.delete(id)) count--;
+      }
+    };
+    id = origSet.call(window, wrapped, delay);
+    pending.set(id, true);
+    count++;
+    return id;
+  };
+  window.clearTimeout = function (id) {
+    if (pending.delete(id)) count--;
+    return origClear.call(window, id);
+  };
+  Object.defineProperty(window, ${JSON.stringify(PENDING_KEY)}, {
+    get: function () { return count; },
+    configurable: true,
+  });
+})();
+`;
 
 /**
  * Ensure Chrome is installed under cacheDir and return its executable path.
@@ -151,6 +230,71 @@ function patchDoctypeName(root: hast.Root) {
 }
 
 /**
+ * Built-in spec appended to every prerender pass with at least one
+ * applicable user spec. Its three hooks align one-to-one with the
+ * surrounding lifecycle: `prepare` injects the setTimeout tracker,
+ * `waitUntil` runs the composite quiescence gate, `cleanup` strips the
+ * tracker from the final tree. Appended (not prepended) to the spec list
+ * so that user specs prepare first — that way the tracker lands at
+ * head[0] and user specs' `waitUntil` (done-flag polling, etc.) run
+ * before the gate re-asserts quiescence.
+ */
+function quiescenceSpec({
+  networkIdleDuration,
+  maxQuiescenceIterations,
+  quiescenceTimeout,
+}: {
+  networkIdleDuration: number;
+  maxQuiescenceIterations: number;
+  quiescenceTimeout: number | undefined;
+}): PrerenderSpec {
+  const pendingProbe = `window[${JSON.stringify(PENDING_KEY)}] === 0`;
+  const pendingRead = `window[${JSON.stringify(PENDING_KEY)}]`;
+  const fnOpts =
+    quiescenceTimeout !== undefined ? { timeout: quiescenceTimeout } : {};
+
+  return {
+    when: () => true,
+    prepare: (tree) => {
+      prependToHead(
+        tree,
+        inlineScript(TRACKER_SCRIPT, { [TRACKER_MARKER]: "" }),
+      );
+    },
+    // Catches two blind spots of single-signal waiting: (1) done flags
+    // that fire before the library's own trailing setTimeout(0) cleanup
+    // runs, and (2) network-idle windows that open momentarily inside a
+    // setTimeout(0) macrotask gap (autoloader chains). Alternates between
+    // draining tracked timers and requiring network idleness, re-checking
+    // after each pass because a draining callback may have scheduled new
+    // work.
+    waitUntil: async (page) => {
+      for (let i = 0; i < maxQuiescenceIterations; i++) {
+        await page.waitForFunction(pendingProbe, fnOpts);
+        await page.waitForNetworkIdle({
+          idleTime: networkIdleDuration,
+          ...(quiescenceTimeout !== undefined && {
+            timeout: quiescenceTimeout,
+          }),
+        });
+        const pending = (await page.evaluate(pendingRead)) as number;
+        if (pending === 0) return;
+      }
+      throw new Error(
+        `prerender: failed to reach quiescence after ${maxQuiescenceIterations} iterations`,
+      );
+    },
+    cleanup: (tree) => {
+      removeElements(
+        tree,
+        (el) =>
+          el.tagName === "script" && TRACKER_MARKER in (el.properties ?? {}),
+      );
+    },
+  };
+}
+
+/**
  * Headless-browser pre-render plugin for unified. Each spec describes one
  * legacy library embedded in the manuscript: how to detect it, what to
  * inject so completion can be observed, how to wait, and how to clean up.
@@ -164,6 +308,13 @@ export function prerender(options: PrerenderOptions) {
   const browserCacheDir = options.browserCacheDir;
   const chromeBuildId = options.chromeBuildId ?? DEFAULT_CHROME_BUILD_ID;
   const launchArgs = options.launchArgs ?? [];
+  const builtin = quiescenceSpec({
+    networkIdleDuration:
+      options.networkIdleDuration ?? DEFAULT_NETWORK_IDLE_DURATION_MS,
+    maxQuiescenceIterations:
+      options.maxQuiescenceIterations ?? DEFAULT_MAX_QUIESCENCE_ITERATIONS,
+    quiescenceTimeout: options.quiescenceTimeout,
+  });
 
   return async (node: unist.Node, file: VFile) => {
     const tree = node as hast.Root;
@@ -176,6 +327,15 @@ export function prerender(options: PrerenderOptions) {
     if (applicable.length === 0) {
       return tree;
     }
+    applicable.push(builtin);
+    // Setup phases (prepare, waitUntil) run forward through the spec list;
+    // teardown phases (finalize, cleanup) run in reverse (LIFO), so that
+    // specs unwind in the opposite order they were set up — matching the
+    // conventions of try/finally, context managers, and middleware. For
+    // the built-in spec this places its tracker injection at head[0] and
+    // its gate after user waitUntil during setup, and its tracker removal
+    // first during teardown.
+    const reversed = [...applicable].reverse();
 
     for (const s of applicable) {
       await s.prepare?.(tree);
@@ -241,7 +401,7 @@ export function prerender(options: PrerenderOptions) {
         await s.waitUntil?.(page);
       }
 
-      for (const s of applicable) {
+      for (const s of reversed) {
         if (s.finalize) {
           await s.finalize(page);
         }
@@ -255,7 +415,7 @@ export function prerender(options: PrerenderOptions) {
     const rendered = fromHtml(serialized);
     patchDoctypeName(rendered);
 
-    for (const s of applicable) {
+    for (const s of reversed) {
       await s.cleanup?.(rendered);
     }
 

@@ -48,6 +48,19 @@ export type PrerenderSpec = {
    * injected done-flag script and the library's own <script> references.
    */
   cleanup?: (tree: hast.Root) => unknown | Promise<unknown>;
+  /**
+   * Minimum idle-time (ms) that the core quiescence gate must observe on
+   * the network before declaring this spec's work done. Core takes the
+   * maximum across all applicable specs and uses it as the `idleTime`
+   * argument to `page.waitForNetworkIdle`. Set when the library continues
+   * async work via dynamic `<script>` onload chains (Prism autoloader,
+   * etc.): between an `onload` firing and the next `<script>` being
+   * registered there is a sub-millisecond window in which the network
+   * appears idle, and `idleTime = 0` races that window. Omit when the
+   * library's only async work is visible via the pending-setTimeout
+   * tracker or has no fetch chains.
+   */
+  networkIdleDuration?: number;
 };
 
 export type PrerenderOptions = {
@@ -79,19 +92,6 @@ export type PrerenderOptions = {
   resolveResource?: (pathname: string, file: VFile) => string | null;
   navigationTimeout?: number;
   /**
-   * After every spec's `waitUntil` resolves, the core re-asserts quiescence
-   * by alternating (a) a wait for all tracked short-delay setTimeouts to
-   * drain and (b) a `page.waitForNetworkIdle`. `networkIdleDuration` is the
-   * duration (in ms) the network must remain continuously idle before that
-   * leg returns, forwarded as `idleTime` to puppeteer. Defaults to 0,
-   * i.e. "idle right now is enough". Raise it to add a settle buffer when
-   * legacy libraries fetch on microtask boundaries that briefly register as
-   * idle; leave at 0 for libraries whose only async work is non-network
-   * setTimeouts, since the pending-timer gate already covers those and any
-   * positive value becomes pure wasted time.
-   */
-  networkIdleDuration?: number;
-  /**
    * Upper bound on the number of (pending-tasks-drained → network-idle)
    * alternation passes before the core quiescence gate gives up. Defaults
    * to 20. Each pass absorbs one level of "the last callback scheduled
@@ -110,7 +110,6 @@ export type PrerenderOptions = {
 
 const DEFAULT_BASE_URL = "https://prerender.invalid/";
 const DEFAULT_TIMEOUT_MS = 30_000;
-const DEFAULT_NETWORK_IDLE_DURATION_MS = 0;
 const DEFAULT_MAX_QUIESCENCE_ITERATIONS = 20;
 export const DEFAULT_CHROME_BUILD_ID = "146.0.7680.153";
 
@@ -261,13 +260,6 @@ function quiescenceSpec({
         inlineScript(TRACKER_SCRIPT, { [TRACKER_MARKER]: "" }),
       );
     },
-    // Catches two blind spots of single-signal waiting: (1) done flags
-    // that fire before the library's own trailing setTimeout(0) cleanup
-    // runs, and (2) network-idle windows that open momentarily inside a
-    // setTimeout(0) macrotask gap (autoloader chains). Alternates between
-    // draining tracked timers and requiring network idleness, re-checking
-    // after each pass because a draining callback may have scheduled new
-    // work.
     waitUntil: async (page) => {
       for (let i = 0; i < maxQuiescenceIterations; i++) {
         await page.waitForFunction(pendingProbe, fnOpts);
@@ -308,13 +300,9 @@ export function prerender(options: PrerenderOptions) {
   const browserCacheDir = options.browserCacheDir;
   const chromeBuildId = options.chromeBuildId ?? DEFAULT_CHROME_BUILD_ID;
   const launchArgs = options.launchArgs ?? [];
-  const builtin = quiescenceSpec({
-    networkIdleDuration:
-      options.networkIdleDuration ?? DEFAULT_NETWORK_IDLE_DURATION_MS,
-    maxQuiescenceIterations:
-      options.maxQuiescenceIterations ?? DEFAULT_MAX_QUIESCENCE_ITERATIONS,
-    quiescenceTimeout: options.quiescenceTimeout,
-  });
+  const maxQuiescenceIterations =
+    options.maxQuiescenceIterations ?? DEFAULT_MAX_QUIESCENCE_ITERATIONS;
+  const quiescenceTimeout = options.quiescenceTimeout;
 
   return async (node: unist.Node, file: VFile) => {
     const tree = node as hast.Root;
@@ -327,7 +315,22 @@ export function prerender(options: PrerenderOptions) {
     if (applicable.length === 0) {
       return tree;
     }
-    applicable.push(builtin);
+    // Aggregate the strictest (max) idle buffer declared by any applicable
+    // spec. Values come from the specs themselves, not from PrerenderOptions:
+    // the required duration is a property of the library a spec targets
+    // (Prism autoloader chains need ~500ms; MathJax and Twitter declare 0),
+    // not a pipeline-wide user knob.
+    const networkIdleDuration = Math.max(
+      0,
+      ...applicable.map((s) => s.networkIdleDuration ?? 0),
+    );
+    applicable.push(
+      quiescenceSpec({
+        networkIdleDuration,
+        maxQuiescenceIterations,
+        quiescenceTimeout,
+      }),
+    );
     // Setup phases (prepare, waitUntil) run forward through the spec list;
     // teardown phases (finalize, cleanup) run in reverse (LIFO), so that
     // specs unwind in the opposite order they were set up, matching the

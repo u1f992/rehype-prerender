@@ -4,7 +4,7 @@ name: Publish Package
 on:
   push:
     tags:
-      - 'v*'
+      - '*'
 
 permissions:
   id-token: write  # Required for OIDC
@@ -14,6 +14,21 @@ jobs:
   publish:
     runs-on: ubuntu-latest
     steps:
+      - name: Resolve tag to workspace and version
+        id: resolve
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          if [[ "$TAG" == *@* ]]; then
+            name="${TAG%@*}"
+            version="${TAG##*@}"
+          else
+            name="rehype-prerender"
+            version="$TAG"
+          fi
+          echo "name=$name" >> "$GITHUB_OUTPUT"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
       - uses: actions/checkout@v6
 
       - uses: actions/setup-node@v6
@@ -21,6 +36,6 @@ jobs:
           node-version: '24'
           registry-url: 'https://registry.npmjs.org'
       - run: npm ci
-      - run: npm run build --if-present
-      - run: npm test
-      - run: npm publish
+      - run: npm run build
+      - run: npm test --workspace=${{ steps.resolve.outputs.name }}
+      - run: npm publish --workspace=${{ steps.resolve.outputs.name }}

@@ -405,9 +405,7 @@ export function prerender(options: PrerenderOptions) {
       }
 
       for (const s of reversed) {
-        if (s.finalize) {
-          await s.finalize(page);
-        }
+        await s.finalize?.(page);
       }
 
       serialized = await page.content();

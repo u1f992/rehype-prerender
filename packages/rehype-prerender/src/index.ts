@@ -86,13 +86,11 @@ export type PrerenderOptions = {
   baseUrl?: string;
   /**
    * Produce the response body for a pathname under baseUrl, or null to
-   * return 404. Defaults to reading the file resolved against `file.dirname`
-   * with escape prevention.
+   * return 404. The content type is derived from the pathname's extension;
+   * the resolver itself does not concern itself with mime. Defaults to
+   * reading the file resolved against `file.dirname` with escape prevention.
    */
-  resolveResource?: (
-    pathname: string,
-    file: VFile,
-  ) => { contentType: string; body: string | Buffer } | null;
+  resolveResource?: (pathname: string, file: VFile) => string | Buffer | null;
   navigationTimeout?: number;
   /**
    * Upper bound on the number of (pending-tasks-drained → network-idle)
@@ -196,14 +194,10 @@ export async function ensureBrowserExecutable({
 }
 
 /**
- * Default resolver. Reads the file at `path.resolve(file.dirname, pathname)`
- * and returns it with a mime-sniffed content type, refusing to resolve
- * outside the document directory or missing files.
+ * Default resolver. Reads the file at `path.resolve(file.dirname, pathname)`,
+ * refusing to resolve outside the document directory or missing files.
  */
-function defaultResolveResource(
-  pathname: string,
-  file: VFile,
-): { contentType: string; body: string | Buffer } | null {
+function defaultResolveResource(pathname: string, file: VFile): Buffer | null {
   const baseDir = file.dirname;
   if (!baseDir) {
     return null;
@@ -220,10 +214,7 @@ function defaultResolveResource(
   if (!fs.existsSync(resolved) || !fs.statSync(resolved).isFile()) {
     return null;
   }
-  return {
-    contentType: mime.getType(resolved) ?? "text/plain; charset=utf-8",
-    body: fs.readFileSync(resolved),
-  };
+  return fs.readFileSync(resolved);
 }
 
 /**
@@ -257,7 +248,8 @@ function createRequestHandler({
 
 /**
  * Build the resolve callback for `createRequestHandler`. Returns the
- * manuscript HTML for the entry URL, otherwise delegates to `fallback`.
+ * manuscript HTML for the entry URL, otherwise delegates to `fallback` for
+ * the body and derives the content type from the pathname's extension.
  */
 function createResolveContent({
   entryFilename,
@@ -266,9 +258,7 @@ function createResolveContent({
 }: {
   entryFilename: string;
   html: string;
-  fallback: (
-    pathname: string,
-  ) => { contentType: string; body: string | Buffer } | null;
+  fallback: (pathname: string) => string | Buffer | null;
 }) {
   return (
     pathname: string,
@@ -276,7 +266,14 @@ function createResolveContent({
     if (pathname === "/" + entryFilename) {
       return { contentType: "text/html; charset=utf-8", body: html };
     }
-    return fallback(pathname);
+    const body = fallback(pathname);
+    if (body === null) {
+      return null;
+    }
+    return {
+      contentType: mime.getType(pathname) ?? "text/plain; charset=utf-8",
+      body,
+    };
   };
 }
 

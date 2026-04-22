@@ -311,3 +311,66 @@ test("Prism: locally bundled prismjs under fixtures/ is consumed via relative <s
     fs.rmSync(localPrismDir, { recursive: true, force: true });
   }
 });
+
+test("Prism file-highlight + autoloader: locally bundled prismjs under fixtures/ loads the data-src external file and tokenizes it", async () => {
+  const htmlPath = path.join(
+    FIXTURES_DIR,
+    "file-highlight-autoloader.local.html",
+  );
+  const localPrismDir = path.join(FIXTURES_DIR, "prism");
+  const sourcePrismDir = path.dirname(
+    url.fileURLToPath(import.meta.resolve("prismjs/package.json")),
+  );
+  fs.cpSync(sourcePrismDir, localPrismDir, { recursive: true });
+  try {
+    const html = fs.readFileSync(htmlPath, "utf-8");
+    const localSpec = prismSpec({
+      srcs: [
+        "prism/components/prism-core.min.js",
+        "prism/plugins/autoloader/prism-autoloader.min.js",
+        "prism/plugins/file-highlight/prism-file-highlight.min.js",
+      ],
+    });
+    const result = await rehype()
+      .use(prerender, {
+        specs: [localSpec],
+        ...PRERENDER_TEST_OPTS,
+      })
+      .process({ contents: html, path: htmlPath });
+    const output = String(result);
+
+    assert.ok(
+      /<span[^>]*class="token/.test(output),
+      `No Prism tokens found: ${output.slice(0, 400)}`,
+    );
+    assert.ok(
+      output.includes("hello from file"),
+      "External file code text is missing",
+    );
+    assert.ok(
+      !/<script[^>]+src="[^"]*prism\//i.test(output),
+      "Local Prism script reference is still present",
+    );
+    assert.ok(
+      !output.includes("Prism.highlightAll"),
+      "Injected runner script is still present",
+    );
+
+    fs.mkdirSync(RESULTS_DIR, { recursive: true });
+    fs.writeFileSync(
+      path.join(RESULTS_DIR, "file-highlight-autoloader.local.html"),
+      output,
+    );
+
+    await assertVisualMatchRender(htmlPath, output, {
+      ...PRERENDER_TEST_OPTS,
+      fixturesDir: FIXTURES_DIR,
+      diffOutputPath: path.join(
+        RESULTS_DIR,
+        "file-highlight-autoloader.local-diff.png",
+      ),
+    });
+  } finally {
+    fs.rmSync(localPrismDir, { recursive: true, force: true });
+  }
+});

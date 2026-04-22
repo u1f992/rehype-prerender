@@ -85,11 +85,14 @@ export type PrerenderOptions = {
    */
   baseUrl?: string;
   /**
-   * Map a pathname under baseUrl to an absolute filesystem path, or null to
-   * return 404. Defaults to resolving against file.dirname with
-   * escape prevention.
+   * Produce the response body for a pathname under baseUrl, or null to
+   * return 404. Defaults to reading the file resolved against `file.dirname`
+   * with escape prevention.
    */
-  resolveResource?: (pathname: string, file: VFile) => string | null;
+  resolveResource?: (
+    pathname: string,
+    file: VFile,
+  ) => { contentType: string; body: string | Buffer } | null;
   navigationTimeout?: number;
   /**
    * Upper bound on the number of (pending-tasks-drained → network-idle)
@@ -193,11 +196,14 @@ export async function ensureBrowserExecutable({
 }
 
 /**
- * Default resolver. Maps `baseUrl/<pathname>` to
- * `path.resolve(file.dirname, pathname)`, refusing to resolve outside the
- * document directory.
+ * Default resolver. Reads the file at `path.resolve(file.dirname, pathname)`
+ * and returns it with a mime-sniffed content type, refusing to resolve
+ * outside the document directory or missing files.
  */
-function defaultResolveResource(pathname: string, file: VFile): string | null {
+function defaultResolveResource(
+  pathname: string,
+  file: VFile,
+): { contentType: string; body: string | Buffer } | null {
   const baseDir = file.dirname;
   if (!baseDir) {
     return null;
@@ -211,7 +217,13 @@ function defaultResolveResource(pathname: string, file: VFile): string | null {
   if (rel === "" || rel.startsWith("..") || path.isAbsolute(rel)) {
     return null;
   }
-  return resolved;
+  if (!fs.existsSync(resolved) || !fs.statSync(resolved).isFile()) {
+    return null;
+  }
+  return {
+    contentType: mime.getType(resolved) ?? "text/plain; charset=utf-8",
+    body: fs.readFileSync(resolved),
+  };
 }
 
 /**
@@ -245,17 +257,18 @@ function createRequestHandler({
 
 /**
  * Build the resolve callback for `createRequestHandler`. Returns the
- * manuscript HTML for the entry URL, otherwise forwards to `resolveFsPath`
- * and reads the resulting file from disk.
+ * manuscript HTML for the entry URL, otherwise delegates to `fallback`.
  */
 function createResolveContent({
   entryFilename,
   html,
-  resolveFsPath,
+  fallback,
 }: {
   entryFilename: string;
   html: string;
-  resolveFsPath: (pathname: string) => string | null;
+  fallback: (
+    pathname: string,
+  ) => { contentType: string; body: string | Buffer } | null;
 }) {
   return (
     pathname: string,
@@ -263,14 +276,7 @@ function createResolveContent({
     if (pathname === "/" + entryFilename) {
       return { contentType: "text/html; charset=utf-8", body: html };
     }
-    const fsPath = resolveFsPath(pathname);
-    if (!fsPath || !fs.existsSync(fsPath) || !fs.statSync(fsPath).isFile()) {
-      return null;
-    }
-    return {
-      contentType: mime.getType(fsPath) ?? "text/plain; charset=utf-8",
-      body: fs.readFileSync(fsPath),
-    };
+    return fallback(pathname);
   };
 }
 
@@ -426,7 +432,7 @@ export function prerender(options: PrerenderOptions) {
           resolve: createResolveContent({
             entryFilename: ENTRY_FILENAME,
             html,
-            resolveFsPath: (pathname) => resolveResource(pathname, file),
+            fallback: (pathname) => resolveResource(pathname, file),
           }),
         }),
       );

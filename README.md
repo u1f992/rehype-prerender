@@ -68,6 +68,14 @@ Keeping the tag's version in sync with the target `package.json`'s
 `version` is the releaser's responsibility — not enforced by CI. Bump
 `version`, commit, then tag that commit, as in the example above.
 
+A subpackage's declared `rehype-prerender` range needs updating when
+`rehype-prerender` introduces a change that breaks the subpackage's
+compatibility — by semver that's a major bump, which also falls outside
+the current `"^1.0.0"`. Do it in the same commit as the bump. A stale
+range still resolves locally via the workspace symlink, but `npm ci` in
+CI tries to fetch the pinned version from the registry and fails before
+publish.
+
 `packages/test-helpers` and the repository root are `private: true` and are
 never published. Each publishable workspace declares a `repository` field
 (with `directory`) pointing at its path in the monorepo; npm's trusted

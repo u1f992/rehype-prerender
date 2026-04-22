@@ -245,19 +245,17 @@ function createRequestHandler({
 
 /**
  * Build the resolve callback for `createRequestHandler`. Returns the
- * manuscript HTML for the entry URL, otherwise forwards to `resolveResource`
+ * manuscript HTML for the entry URL, otherwise forwards to `resolveFsPath`
  * and reads the resulting file from disk.
  */
 function createResolveContent({
   entryFilename,
   html,
-  resolveResource,
-  file,
+  resolveFsPath,
 }: {
   entryFilename: string;
   html: string;
-  resolveResource: (pathname: string, file: VFile) => string | null;
-  file: VFile;
+  resolveFsPath: (pathname: string) => string | null;
 }) {
   return (
     pathname: string,
@@ -265,7 +263,7 @@ function createResolveContent({
     if (pathname === "/" + entryFilename) {
       return { contentType: "text/html; charset=utf-8", body: html };
     }
-    const fsPath = resolveResource(pathname, file);
+    const fsPath = resolveFsPath(pathname);
     if (!fsPath || !fs.existsSync(fsPath) || !fs.statSync(fsPath).isFile()) {
       return null;
     }
@@ -428,8 +426,7 @@ export function prerender(options: PrerenderOptions) {
           resolve: createResolveContent({
             entryFilename: ENTRY_FILENAME,
             html,
-            resolveResource,
-            file,
+            resolveFsPath: (pathname) => resolveResource(pathname, file),
           }),
         }),
       );

@@ -86,11 +86,12 @@ export type PrerenderOptions = {
   baseUrl?: string;
   /**
    * Produce the response body for a pathname under baseUrl, or null to
-   * return 404. The content type is derived from the pathname's extension;
-   * the resolver itself does not concern itself with mime. Defaults to
-   * reading the file resolved against `file.dirname` with escape prevention.
+   * return 404. The content type is derived from the pathname's extension
+   * and falls back to `application/octet-stream`; the resolver itself does
+   * not concern itself with mime. Defaults to reading the file resolved
+   * against `file.dirname` with escape prevention.
    */
-  resolveResource?: (pathname: string, file: VFile) => string | Buffer | null;
+  resolveResource?: (pathname: string, file: VFile) => Uint8Array | null;
   navigationTimeout?: number;
   /**
    * Upper bound on the number of (pending-tasks-drained → network-idle)
@@ -197,7 +198,10 @@ export async function ensureBrowserExecutable({
  * Default resolver. Reads the file at `path.resolve(file.dirname, pathname)`,
  * refusing to resolve outside the document directory or missing files.
  */
-function defaultResolveResource(pathname: string, file: VFile): Buffer | null {
+function defaultResolveResource(
+  pathname: string,
+  file: VFile,
+): Uint8Array | null {
   const baseDir = file.dirname;
   if (!baseDir) {
     return null;
@@ -229,7 +233,7 @@ function createRequestHandler({
   baseUrl: string;
   resolve: (
     pathname: string,
-  ) => { contentType: string; body: string | Buffer } | null;
+  ) => { contentType: string; body: string | Uint8Array } | null;
 }) {
   return (req: HTTPRequest) => {
     const url = req.url();
@@ -258,11 +262,11 @@ function createResolveContent({
 }: {
   entryFilename: string;
   html: string;
-  fallback: (pathname: string) => string | Buffer | null;
+  fallback: (pathname: string) => Uint8Array | null;
 }) {
   return (
     pathname: string,
-  ): { contentType: string; body: string | Buffer } | null => {
+  ): { contentType: string; body: string | Uint8Array } | null => {
     if (pathname === "/" + entryFilename) {
       return { contentType: "text/html; charset=utf-8", body: html };
     }
@@ -271,7 +275,7 @@ function createResolveContent({
       return null;
     }
     return {
-      contentType: mime.getType(pathname) ?? "text/plain; charset=utf-8",
+      contentType: mime.getType(pathname) ?? "application/octet-stream",
       body,
     };
   };

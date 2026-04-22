@@ -111,6 +111,7 @@ export type PrerenderOptions = {
 const DEFAULT_BASE_URL = "https://prerender.invalid/";
 const DEFAULT_TIMEOUT_MS = 30_000;
 const DEFAULT_MAX_QUIESCENCE_ITERATIONS = 20;
+const ENTRY_FILENAME = "__prerender_entry__.html";
 export const DEFAULT_CHROME_BUILD_ID = "146.0.7680.153";
 
 const PENDING_KEY = "__rehypePrerenderPendingTasks";
@@ -214,34 +215,21 @@ function defaultResolveResource(pathname: string, file: VFile): string | null {
 }
 
 /**
- * Build the puppeteer request interceptor used during pre-render. Serves the
- * entry URL as the manuscript HTML itself, maps other requests under
- * `baseUrl` through `resolve` to a response body, and lets external origins
- * pass through.
+ * Build the puppeteer request interceptor used during pre-render. Maps
+ * requests under `baseUrl` through `resolve` to a response body, and lets
+ * external origins pass through.
  */
 function createRequestHandler({
-  entryUrl,
-  html,
   baseUrl,
   resolve,
 }: {
-  entryUrl: string;
-  html: string;
   baseUrl: string;
-  resolve: (pathname: string) => { contentType: string; body: Buffer } | null;
+  resolve: (
+    pathname: string,
+  ) => { contentType: string; body: string | Buffer } | null;
 }) {
   return (req: HTTPRequest) => {
     const url = req.url();
-    if (url === entryUrl) {
-      req
-        .respond({
-          status: 200,
-          contentType: "text/html; charset=utf-8",
-          body: html,
-        })
-        .catch(() => {});
-      return;
-    }
     if (url.startsWith(baseUrl)) {
       const asset = resolve(new URL(url).pathname);
       if (asset) {
@@ -400,14 +388,14 @@ export function prerender(options: PrerenderOptions) {
       const page = await browser.newPage();
       await page.setRequestInterception(true);
 
-      const entryUrl = baseUrl + "__prerender_entry__.html";
       page.on(
         "request",
         createRequestHandler({
-          entryUrl,
-          html,
           baseUrl,
           resolve: (pathname) => {
+            if (pathname === "/" + ENTRY_FILENAME) {
+              return { contentType: "text/html; charset=utf-8", body: html };
+            }
             const fsPath = resolveResource(pathname, file);
             if (
               !fsPath ||
@@ -424,7 +412,7 @@ export function prerender(options: PrerenderOptions) {
         }),
       );
 
-      await page.goto(entryUrl, {
+      await page.goto(baseUrl + ENTRY_FILENAME, {
         waitUntil: "load",
         timeout: navigationTimeout,
       });

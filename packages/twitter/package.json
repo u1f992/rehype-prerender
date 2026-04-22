@@ -1,6 +1,6 @@
 {
   "name": "rehype-prerender-twitter",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "type": "module",
   "license": "GPL-3.0-only",
   "repository": {
@@ -9,6 +9,9 @@
     "directory": "packages/twitter"
   },
   "main": "./dist/index.js",
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "build": "tsc && tsc --project tests/tsconfig.json",
     "format": "prettier --write src \"tests/**/*.ts\" tests/fixtures",
@@ -17,7 +20,7 @@
   },
   "dependencies": {
     "@types/hast": "^2.0.0",
-    "rehype-prerender": "^1.0.0"
+    "rehype-prerender": "^1.0.1"
   },
   "devDependencies": {
     "rehype": "^11.0.0",

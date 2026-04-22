@@ -1,6 +1,6 @@
 {
   "name": "rehype-prerender",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "type": "module",
   "license": "GPL-3.0-only",
   "repository": {
@@ -12,6 +12,9 @@
     ".": "./dist/index.js",
     "./helpers": "./dist/helpers.js"
   },
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "build": "tsc && tsc --project tests/tsconfig.json",
     "format": "prettier --write src tests",

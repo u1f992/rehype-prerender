@@ -12,7 +12,7 @@ import { fromHtml } from "hast-util-from-html";
 import { select } from "hast-util-select";
 import { toHtml } from "hast-util-to-html";
 import mime from "mime";
-import puppeteer, { type Page } from "puppeteer-core";
+import puppeteer, { type HTTPRequest, type Page } from "puppeteer-core";
 import type * as unist from "unist";
 import { visit, SKIP } from "unist-util-visit";
 import type { VFile } from "vfile";
@@ -213,6 +213,54 @@ function defaultResolveResource(pathname: string, file: VFile): string | null {
   return resolved;
 }
 
+/**
+ * Build the puppeteer request interceptor used during pre-render. Serves the
+ * entry URL as an empty shell, maps other requests under `baseUrl` through
+ * `resolveResource` to the filesystem, and lets external origins pass through.
+ */
+function createRequestHandler({
+  entryUrl,
+  baseUrl,
+  resolveResource,
+  file,
+}: {
+  entryUrl: string;
+  baseUrl: string;
+  resolveResource: (pathname: string, file: VFile) => string | null;
+  file: VFile;
+}) {
+  return (req: HTTPRequest) => {
+    const url = req.url();
+    if (url === entryUrl) {
+      req
+        .respond({
+          status: 200,
+          contentType: "text/html; charset=utf-8",
+          body: "<!doctype html><html><head></head><body></body></html>",
+        })
+        .catch(() => {});
+      return;
+    }
+    if (url.startsWith(baseUrl)) {
+      const u = new URL(url);
+      const fsPath = resolveResource(u.pathname, file);
+      if (fsPath && fs.existsSync(fsPath) && fs.statSync(fsPath).isFile()) {
+        req
+          .respond({
+            status: 200,
+            contentType: mime.getType(fsPath) ?? "text/plain; charset=utf-8",
+            body: fs.readFileSync(fsPath),
+          })
+          .catch(() => {});
+        return;
+      }
+      req.respond({ status: 404, body: "" }).catch(() => {});
+      return;
+    }
+    req.continue().catch(() => {});
+  };
+}
+
 function patchDoctypeName(root: hast.Root) {
   root.children
     .filter((child) => child.type === "doctype" && !("name" in child))
@@ -359,37 +407,10 @@ export function prerender(options: PrerenderOptions) {
       await page.setRequestInterception(true);
 
       const entryUrl = baseUrl + "__prerender_entry__.html";
-      page.on("request", (req) => {
-        const url = req.url();
-        if (url === entryUrl) {
-          req
-            .respond({
-              status: 200,
-              contentType: "text/html; charset=utf-8",
-              body: "<!doctype html><html><head></head><body></body></html>",
-            })
-            .catch(() => {});
-          return;
-        }
-        if (url.startsWith(baseUrl)) {
-          const u = new URL(url);
-          const fsPath = resolveResource(u.pathname, file);
-          if (fsPath && fs.existsSync(fsPath) && fs.statSync(fsPath).isFile()) {
-            req
-              .respond({
-                status: 200,
-                contentType:
-                  mime.getType(fsPath) ?? "text/plain; charset=utf-8",
-                body: fs.readFileSync(fsPath),
-              })
-              .catch(() => {});
-            return;
-          }
-          req.respond({ status: 404, body: "" }).catch(() => {});
-          return;
-        }
-        req.continue().catch(() => {});
-      });
+      page.on(
+        "request",
+        createRequestHandler({ entryUrl, baseUrl, resolveResource, file }),
+      );
 
       await page.goto(entryUrl, {
         waitUntil: "domcontentloaded",

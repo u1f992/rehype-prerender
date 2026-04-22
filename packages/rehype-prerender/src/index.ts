@@ -83,7 +83,7 @@ export type PrerenderOptions = {
    * by alternating (a) a wait for all tracked short-delay setTimeouts to
    * drain and (b) a `page.waitForNetworkIdle`. `networkIdleDuration` is the
    * duration (in ms) the network must remain continuously idle before that
-   * leg returns — forwarded as `idleTime` to puppeteer. Defaults to 0,
+   * leg returns, forwarded as `idleTime` to puppeteer. Defaults to 0,
    * i.e. "idle right now is enough". Raise it to add a settle buffer when
    * legacy libraries fetch on microtask boundaries that briefly register as
    * idle; leave at 0 for libraries whose only async work is non-network
@@ -124,7 +124,7 @@ const TRACKER_MARKER = "dataRehypePrerender";
 // through unmodified so they do not block completion. The counter is
 // decremented in a finally block after the callback returns, so the counter
 // remains non-zero while the callback is executing and its synchronous
-// descendants run — the gate only opens once that entire synchronous cascade
+// descendants run. The gate only opens once that entire synchronous cascade
 // has finished.
 const TRACKER_SCRIPT = `
 (function () {
@@ -231,13 +231,13 @@ function patchDoctypeName(root: hast.Root) {
 
 /**
  * Built-in spec appended to every prerender pass with at least one
- * applicable user spec. Its three hooks align one-to-one with the
- * surrounding lifecycle: `prepare` injects the setTimeout tracker,
- * `waitUntil` runs the composite quiescence gate, `cleanup` strips the
- * tracker from the final tree. Appended (not prepended) to the spec list
- * so that user specs prepare first — that way the tracker lands at
- * head[0] and user specs' `waitUntil` (done-flag polling, etc.) run
- * before the gate re-asserts quiescence.
+ * applicable user spec. Its three hooks match the surrounding lifecycle:
+ * `prepare` injects the setTimeout tracker, `waitUntil` runs the
+ * composite quiescence gate, `cleanup` strips the tracker from the final
+ * tree. Appended (not prepended) to the spec list so that user specs
+ * prepare first; that way the tracker lands at head[0] and user specs'
+ * `waitUntil` (done-flag polling, etc.) run before the gate re-asserts
+ * quiescence.
  */
 function quiescenceSpec({
   networkIdleDuration,
@@ -330,7 +330,7 @@ export function prerender(options: PrerenderOptions) {
     applicable.push(builtin);
     // Setup phases (prepare, waitUntil) run forward through the spec list;
     // teardown phases (finalize, cleanup) run in reverse (LIFO), so that
-    // specs unwind in the opposite order they were set up — matching the
+    // specs unwind in the opposite order they were set up, matching the
     // conventions of try/finally, context managers, and middleware. For
     // the built-in spec this places its tracker injection at head[0] and
     // its gate after user waitUntil during setup, and its tracker removal

@@ -46,7 +46,7 @@ async function launch(options: BrowserOptions) {
 }
 
 /**
- * Screenshot HTML that is expected to be self-contained — i.e. the output of
+ * Screenshot HTML that is expected to be self-contained, i.e. the output of
  * rehype-prerender after all external libraries have been inlined. Uses
  * `page.setContent` with no asset serving, deliberately: if rendering needs
  * interception or a local server to match the live fixture, the plugin has

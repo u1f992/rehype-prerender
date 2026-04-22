@@ -89,9 +89,18 @@ export type PrerenderOptions = {
    * return 404. The content type is derived from the pathname's extension
    * and falls back to `application/octet-stream`; the resolver itself does
    * not concern itself with mime. Defaults to reading the file resolved
-   * against `file.dirname` with escape prevention.
+   * against `file.dirname`, honoring `preventPathTraversal`.
    */
   resolveResource?: (pathname: string, file: VFile) => Uint8Array | null;
+  /**
+   * When the default resolver is in use, refuse pathnames that resolve
+   * outside `file.dirname` (absolute paths, `../` escapes, the directory
+   * itself). Defaults to `true`. Has no effect when `resolveResource` is
+   * overridden. Disable only when the manuscript is trusted and the
+   * pre-render needs to reach sibling directories (e.g. a shared assets
+   * tree one level up).
+   */
+  preventPathTraversal?: boolean;
   navigationTimeout?: number;
   /**
    * Upper bound on the number of (pending-tasks-drained → network-idle)
@@ -195,30 +204,36 @@ export async function ensureBrowserExecutable({
 }
 
 /**
- * Default resolver. Reads the file at `path.resolve(file.dirname, pathname)`,
- * refusing to resolve outside the document directory or missing files.
+ * Build the default resolver. Reads the file at
+ * `path.resolve(file.dirname, pathname)`, optionally refusing to resolve
+ * outside the document directory.
  */
-function defaultResolveResource(
-  pathname: string,
-  file: VFile,
-): Uint8Array | null {
-  const baseDir = file.dirname;
-  if (!baseDir) {
-    return null;
-  }
-  const decoded = decodeURIComponent(pathname.replace(/^\//, ""));
-  if (!decoded) {
-    return null;
-  }
-  const resolved = path.resolve(baseDir, decoded);
-  const rel = path.relative(baseDir, resolved);
-  if (rel === "" || rel.startsWith("..") || path.isAbsolute(rel)) {
-    return null;
-  }
-  if (!fs.existsSync(resolved) || !fs.statSync(resolved).isFile()) {
-    return null;
-  }
-  return fs.readFileSync(resolved);
+function createDefaultResolveResource({
+  preventPathTraversal,
+}: {
+  preventPathTraversal: boolean;
+}) {
+  return (pathname: string, file: VFile): Uint8Array | null => {
+    const baseDir = file.dirname;
+    if (!baseDir) {
+      return null;
+    }
+    const decoded = decodeURIComponent(pathname.replace(/^\//, ""));
+    if (!decoded) {
+      return null;
+    }
+    const resolved = path.resolve(baseDir, decoded);
+    if (preventPathTraversal) {
+      const rel = path.relative(baseDir, resolved);
+      if (rel === "" || rel.startsWith("..") || path.isAbsolute(rel)) {
+        return null;
+      }
+    }
+    if (!fs.existsSync(resolved) || !fs.statSync(resolved).isFile()) {
+      return null;
+    }
+    return fs.readFileSync(resolved);
+  };
 }
 
 /**
@@ -363,7 +378,11 @@ export function prerender(options: PrerenderOptions) {
   const specs = options.specs;
   const rawBaseUrl = options.baseUrl ?? DEFAULT_BASE_URL;
   const baseUrl = rawBaseUrl.endsWith("/") ? rawBaseUrl : rawBaseUrl + "/";
-  const resolveResource = options.resolveResource ?? defaultResolveResource;
+  const resolveResource =
+    options.resolveResource ??
+    createDefaultResolveResource({
+      preventPathTraversal: options.preventPathTraversal ?? true,
+    });
   const navigationTimeout = options.navigationTimeout ?? DEFAULT_TIMEOUT_MS;
   const browserCacheDir = options.browserCacheDir;
   const chromeBuildId = options.chromeBuildId ?? DEFAULT_CHROME_BUILD_ID;

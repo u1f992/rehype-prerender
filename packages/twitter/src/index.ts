@@ -1,15 +1,17 @@
 import type * as hast from "hast";
 
 import {
+  prerender,
+  type PrerenderOptions,
+  type PrerenderSpec,
+} from "rehype-prerender";
+import {
   hasElement,
   hasMatch,
   inlineScript,
   prependToHead,
-  prerender,
   removeElements,
-  type PrerenderOptions,
-  type PrerenderSpec,
-} from "rehype-prerender";
+} from "rehype-prerender/helpers";
 
 const DONE_KEY = "twitter-prerender-done";
 const MARKER = "dataPrerenderTwitter";

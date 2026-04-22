@@ -1,14 +1,16 @@
 import type * as hast from "hast";
 
 import {
-  hasElement,
-  inlineScript,
-  prependToHead,
   prerender,
-  removeElements,
   type PrerenderOptions,
   type PrerenderSpec,
 } from "rehype-prerender";
+import {
+  hasElement,
+  inlineScript,
+  prependToHead,
+  removeElements,
+} from "rehype-prerender/helpers";
 
 const MARKER = "dataPrerenderPrism";
 

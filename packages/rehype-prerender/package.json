@@ -2,6 +2,7 @@
   "name": "rehype-prerender",
   "version": "0.0.0",
   "type": "module",
+  "license": "GPL-3.0-only",
   "exports": {
     ".": "./dist/index.js",
     "./helpers": "./dist/helpers.js"
